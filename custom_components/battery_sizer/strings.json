@@ -1,0 +1,272 @@
+{
+  "config": {
+    "step": {
+      "source": {
+        "title": "Where does the hourly energy come from?",
+        "description": "Batteri-beregner simulates a battery on your own hourly history in Home Assistant. Choose **Inverter** if your inverter reports the home's load and the solar production. That is the right choice if you already have a battery, because the grid meter shows what the existing battery already does. Otherwise choose **Grid meter**, for example ElOverblik.",
+        "data": {
+          "source": "Data source"
+        },
+        "data_description": {
+          "source": "The calculation uses the statistics Home Assistant keeps for ever, hour by hour."
+        }
+      },
+      "energy": {
+        "title": "Energy statistics",
+        "description": "Pick the statistics with the hourly energy. They must be energy sensors or statistics in kWh that count up, such as `sensor.…_total_…` or ElOverblik's `eloverblik_dk:energy_…`.",
+        "data": {
+          "import_statistic": "Bought from the grid",
+          "export_statistic": "Sold to the grid",
+          "load_statistic": "Home load",
+          "solar_statistic": "Solar production"
+        },
+        "data_description": {
+          "import_statistic": "The grid consumption, for example ElOverblik's D07.",
+          "export_statistic": "Return to grid, for example ElOverblik's D06. Leave it empty if you have no solar.",
+          "load_statistic": "Everything the home uses, from the inverter.",
+          "solar_statistic": "Everything the solar panels produce, from the inverter."
+        }
+      },
+      "prices": {
+        "title": "Prices",
+        "description": "Pick the price statistics. The buy price must include everything: spot price, supplier, grid tariff, taxes and VAT, as the Energi Data Service integration shows it. The sell price is usually the spot price without VAT, for example Nord Pool. Only hours with both prices are used.",
+        "data": {
+          "buy_price_statistic": "Buy price (everything included)",
+          "sell_price_statistic": "Sell price (spot)",
+          "sell_deduction": "Deducted on sale"
+        },
+        "data_description": {
+          "buy_price_statistic": "kr/kWh with tariffs, taxes and VAT.",
+          "sell_price_statistic": "kr/kWh. A private seller gets no VAT on top.",
+          "sell_deduction": "What your supplier and the grid keep per kWh sold (supplier fee and feed-in tariff). It is subtracted from the sell price. Typically 0.02-0.10 kr/kWh; see your settlement."
+        }
+      },
+      "battery": {
+        "title": "Battery and inverter",
+        "description": "Type in your battery and inverter. If you already have a battery, the calculation is about **expanding** it: only the extra savings count, against the price of the extra modules.",
+        "data": {
+          "existing_kwh": "Existing battery",
+          "power_kw": "Inverter power",
+          "usable_pct": "Usable capacity",
+          "efficiency_pct": "Round-trip efficiency",
+          "grid_limit_kw": "Main fuse limit"
+        },
+        "data_description": {
+          "existing_kwh": "0 if you have no battery. Otherwise its nominal capacity.",
+          "power_kw": "How fast the battery can charge and discharge, limited by the inverter (and the battery). For example 5, 10 or 12 kW.",
+          "usable_pct": "How much of the nominal capacity can be used. Typically 90-95 % for LFP.",
+          "efficiency_pct": "Of 1 kWh stored, how much comes back. Typically 85-92 %.",
+          "grid_limit_kw": "Most the main fuse allows from or to the grid. 3x25 A is about 17 kW. 0 = no limit."
+        }
+      },
+      "costs": {
+        "title": "Prices and lifetime",
+        "description": "Type in what the battery costs. **Battery price** is the price of one more kWh (extra modules). **System price incl. battery** is a quote for a complete new system; with **its battery size** the calculation works out what the system costs besides its battery. With an existing battery, only the battery price and the expansion cost are used.",
+        "data": {
+          "battery_price_per_kwh": "Battery price",
+          "system_price": "System price incl. battery",
+          "system_battery_kwh": "Battery size in the system price",
+          "expansion_cost": "Expansion cost",
+          "lifetime_years": "Lifetime",
+          "cycle_life": "Cycle life",
+          "discount_pct": "Interest rate",
+          "max_kwh": "Largest size to try",
+          "step_kwh": "Step between sizes",
+          "history_years": "History to use"
+        },
+        "data_description": {
+          "battery_price_per_kwh": "kr per kWh of battery, for example 12,000 kr for 16 kWh = 750 kr/kWh.",
+          "system_price": "Total price for a new system with inverter, battery and installation. 0 if you only want to compare battery sizes.",
+          "system_battery_kwh": "How many kWh of battery the system price includes.",
+          "expansion_cost": "One-off cost for fitting extra modules to an existing battery.",
+          "lifetime_years": "How many years the battery lasts.",
+          "cycle_life": "How many full cycles the battery is rated for. The battery ends at the years or the cycles, whichever comes first. Its wear per kWh is the battery price divided by the cycle life.",
+          "discount_pct": "What money is worth to you per year, for the net present value. For example a loan rate or what the money could earn elsewhere.",
+          "max_kwh": "With an existing battery: the largest addition to try.",
+          "step_kwh": "The sizes tried are 0, step, 2 x step and so on up to the largest size.",
+          "history_years": "How far back to read. Only hours with both energy and prices are used."
+        }
+      }
+    },
+    "error": {
+      "missing_energy": "Pick the energy statistics for the chosen source.",
+      "missing_prices": "Pick both a buy price and a sell price statistic.",
+      "invalid_battery": "Check the battery: power must be above 0, and usable capacity and efficiency between 50 and 100 %.",
+      "system_price_too_low": "The system price is lower than its battery at the battery price. Check the system price, its battery size or the battery price.",
+      "invalid_costs": "Check the prices, lifetime and cycle life.",
+      "invalid_sizes": "The largest size must be at least one step, and the history must be above 0."
+    },
+    "abort": {
+      "already_configured": "Already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "source": {
+        "title": "Where does the hourly energy come from?",
+        "description": "Batteri-beregner simulates a battery on your own hourly history in Home Assistant. Choose **Inverter** if your inverter reports the home's load and the solar production. That is the right choice if you already have a battery, because the grid meter shows what the existing battery already does. Otherwise choose **Grid meter**, for example ElOverblik.",
+        "data": {
+          "source": "Data source"
+        },
+        "data_description": {
+          "source": "The calculation uses the statistics Home Assistant keeps for ever, hour by hour."
+        }
+      },
+      "energy": {
+        "title": "Energy statistics",
+        "description": "Pick the statistics with the hourly energy. They must be energy sensors or statistics in kWh that count up, such as `sensor.…_total_…` or ElOverblik's `eloverblik_dk:energy_…`.",
+        "data": {
+          "import_statistic": "Bought from the grid",
+          "export_statistic": "Sold to the grid",
+          "load_statistic": "Home load",
+          "solar_statistic": "Solar production"
+        },
+        "data_description": {
+          "import_statistic": "The grid consumption, for example ElOverblik's D07.",
+          "export_statistic": "Return to grid, for example ElOverblik's D06. Leave it empty if you have no solar.",
+          "load_statistic": "Everything the home uses, from the inverter.",
+          "solar_statistic": "Everything the solar panels produce, from the inverter."
+        }
+      },
+      "prices": {
+        "title": "Prices",
+        "description": "Pick the price statistics. The buy price must include everything: spot price, supplier, grid tariff, taxes and VAT, as the Energi Data Service integration shows it. The sell price is usually the spot price without VAT, for example Nord Pool. Only hours with both prices are used.",
+        "data": {
+          "buy_price_statistic": "Buy price (everything included)",
+          "sell_price_statistic": "Sell price (spot)",
+          "sell_deduction": "Deducted on sale"
+        },
+        "data_description": {
+          "buy_price_statistic": "kr/kWh with tariffs, taxes and VAT.",
+          "sell_price_statistic": "kr/kWh. A private seller gets no VAT on top.",
+          "sell_deduction": "What your supplier and the grid keep per kWh sold (supplier fee and feed-in tariff). It is subtracted from the sell price. Typically 0.02-0.10 kr/kWh; see your settlement."
+        }
+      },
+      "battery": {
+        "title": "Battery and inverter",
+        "description": "Type in your battery and inverter. If you already have a battery, the calculation is about **expanding** it: only the extra savings count, against the price of the extra modules.",
+        "data": {
+          "existing_kwh": "Existing battery",
+          "power_kw": "Inverter power",
+          "usable_pct": "Usable capacity",
+          "efficiency_pct": "Round-trip efficiency",
+          "grid_limit_kw": "Main fuse limit"
+        },
+        "data_description": {
+          "existing_kwh": "0 if you have no battery. Otherwise its nominal capacity.",
+          "power_kw": "How fast the battery can charge and discharge, limited by the inverter (and the battery). For example 5, 10 or 12 kW.",
+          "usable_pct": "How much of the nominal capacity can be used. Typically 90-95 % for LFP.",
+          "efficiency_pct": "Of 1 kWh stored, how much comes back. Typically 85-92 %.",
+          "grid_limit_kw": "Most the main fuse allows from or to the grid. 3x25 A is about 17 kW. 0 = no limit."
+        }
+      },
+      "costs": {
+        "title": "Prices and lifetime",
+        "description": "Type in what the battery costs. **Battery price** is the price of one more kWh (extra modules). **System price incl. battery** is a quote for a complete new system; with **its battery size** the calculation works out what the system costs besides its battery. With an existing battery, only the battery price and the expansion cost are used.",
+        "data": {
+          "battery_price_per_kwh": "Battery price",
+          "system_price": "System price incl. battery",
+          "system_battery_kwh": "Battery size in the system price",
+          "expansion_cost": "Expansion cost",
+          "lifetime_years": "Lifetime",
+          "cycle_life": "Cycle life",
+          "discount_pct": "Interest rate",
+          "max_kwh": "Largest size to try",
+          "step_kwh": "Step between sizes",
+          "history_years": "History to use"
+        },
+        "data_description": {
+          "battery_price_per_kwh": "kr per kWh of battery, for example 12,000 kr for 16 kWh = 750 kr/kWh.",
+          "system_price": "Total price for a new system with inverter, battery and installation. 0 if you only want to compare battery sizes.",
+          "system_battery_kwh": "How many kWh of battery the system price includes.",
+          "expansion_cost": "One-off cost for fitting extra modules to an existing battery.",
+          "lifetime_years": "How many years the battery lasts.",
+          "cycle_life": "How many full cycles the battery is rated for. The battery ends at the years or the cycles, whichever comes first. Its wear per kWh is the battery price divided by the cycle life.",
+          "discount_pct": "What money is worth to you per year, for the net present value. For example a loan rate or what the money could earn elsewhere.",
+          "max_kwh": "With an existing battery: the largest addition to try.",
+          "step_kwh": "The sizes tried are 0, step, 2 x step and so on up to the largest size.",
+          "history_years": "How far back to read. Only hours with both energy and prices are used."
+        }
+      }
+    },
+    "error": {
+      "missing_energy": "Pick the energy statistics for the chosen source.",
+      "missing_prices": "Pick both a buy price and a sell price statistic.",
+      "invalid_battery": "Check the battery: power must be above 0, and usable capacity and efficiency between 50 and 100 %.",
+      "system_price_too_low": "The system price is lower than its battery at the battery price. Check the system price, its battery size or the battery price.",
+      "invalid_costs": "Check the prices, lifetime and cycle life.",
+      "invalid_sizes": "The largest size must be at least one step, and the history must be above 0."
+    }
+  },
+  "selector": {
+    "source": {
+      "options": {
+        "inverter": "Inverter: home load and solar production",
+        "grid": "Grid meter: bought and sold (e.g. ElOverblik)"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "last_calculation": {
+        "name": "Last calculation"
+      },
+      "self_consumption_recommended_size": {
+        "name": "Own consumption: recommended battery"
+      },
+      "self_consumption_recommended_expansion": {
+        "name": "Own consumption: recommended expansion"
+      },
+      "self_consumption_annual_savings": {
+        "name": "Own consumption: savings per year"
+      },
+      "self_consumption_payback": {
+        "name": "Own consumption: payback time"
+      },
+      "self_consumption_net_present_value": {
+        "name": "Own consumption: net present value"
+      },
+      "solar_trading_recommended_size": {
+        "name": "Solar and sale: recommended battery"
+      },
+      "solar_trading_recommended_expansion": {
+        "name": "Solar and sale: recommended expansion"
+      },
+      "solar_trading_annual_savings": {
+        "name": "Solar and sale: savings per year"
+      },
+      "solar_trading_payback": {
+        "name": "Solar and sale: payback time"
+      },
+      "solar_trading_net_present_value": {
+        "name": "Solar and sale: net present value"
+      },
+      "grid_trading_recommended_size": {
+        "name": "Trading: recommended battery"
+      },
+      "grid_trading_recommended_expansion": {
+        "name": "Trading: recommended expansion"
+      },
+      "grid_trading_annual_savings": {
+        "name": "Trading: savings per year"
+      },
+      "grid_trading_payback": {
+        "name": "Trading: payback time"
+      },
+      "grid_trading_net_present_value": {
+        "name": "Trading: net present value"
+      }
+    },
+    "button": {
+      "calculate": {
+        "name": "Calculate again"
+      }
+    }
+  },
+  "services": {
+    "calculate": {
+      "name": "Calculate",
+      "description": "Read the history again and recalculate the recommended battery for every strategy."
+    }
+  }
+}

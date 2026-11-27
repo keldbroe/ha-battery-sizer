@@ -2,7 +2,50 @@
 
 Home Assistant integration that recommends a home battery size from your own hourly data and Danish electricity prices. Everything comes from sensors and long-term statistics already in Home Assistant. No external service is called.
 
-> **Status:** the calculation engine is done and tested. The Home Assistant integration (setup, panel and sensors) and the add-on come next.
+> **Status:** the integration (setup, calculation and sensors) works and is tested. A panel with charts and the add-on come next.
+
+## Install with HACS
+
+1. In HACS, choose **Custom repositories** and add `https://github.com/keldbroe/ha-battery-sizer` as an integration.
+2. Download **Batteri-beregner (DK)** and restart Home Assistant.
+3. Go to **Settings → Devices & services → Add integration → Batteri-beregner (DK)**.
+
+## Set it up
+
+Setup has five short pages. Everything can be changed later under **Configure**.
+
+1. **Data source.**
+   - **Inverter:** the home's load and the solar production. Use this if you already have a battery, because the grid meter shows what the existing battery does.
+   - **Grid meter:** bought and sold, for example ElOverblik.
+2. **Energy statistics.** Pick them in the statistics picker. External statistics such as `eloverblik_dk:energy_…` can be picked too.
+3. **Prices.**
+   - **Buy price:** with everything included, for example Energi Data Service.
+   - **Sell price:** the spot price, for example Nord Pool.
+   - **Deducted on sale:** what your supplier and the grid keep per kWh sold.
+4. **Battery and inverter.**
+   - **Existing battery:** 0 if none. Otherwise the calculation is about expanding it.
+   - **Inverter power**, **usable capacity**, **round-trip efficiency** and the **main fuse limit**.
+5. **Prices and lifetime.**
+   - **Battery price** per kWh.
+   - **System price incl. battery** and the battery size it includes.
+   - **Expansion cost.**
+   - **Lifetime** in years and cycles, and an **interest rate**.
+   - Which **sizes** to try, and how much **history** to use.
+
+The calculation runs in the background after setup, once a day, after every change, and when you press **Calculate again** or call the `battery_sizer.calculate` action. It needs at least 30 days that have both energy and prices.
+
+## Sensors
+
+For each strategy (own consumption, solar and sale, trading):
+
+| Sensor | Shows |
+| --- | --- |
+| Recommended battery / recommended expansion | kWh. 0 when no size pays off. The `sizes` attribute lists every size tried with savings, investment, payback, net present value and cycles, for your own charts. |
+| Savings per year | kr per year for the recommended size, or the extra savings from the expansion |
+| Payback time | Years |
+| Net present value | kr over the lifetime |
+
+**Last calculation** (diagnostic) shows when the calculation ran, how many hours it used, and the error if a run failed.
 
 ## What it calculates
 
