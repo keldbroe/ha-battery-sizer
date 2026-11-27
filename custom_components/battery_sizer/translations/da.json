@@ -255,6 +255,30 @@
       },
       "grid_trading_net_present_value": {
         "name": "Handel: nutidsværdi"
+      },
+      "self_consumption_verdict": {
+        "name": "Eget forbrug: konklusion",
+        "state": {
+          "pays_off": "Betaler sig",
+          "does_not_pay_off": "Betaler sig ikke",
+          "no_gain": "Ingen gevinst"
+        }
+      },
+      "solar_trading_verdict": {
+        "name": "Sol og salg: konklusion",
+        "state": {
+          "pays_off": "Betaler sig",
+          "does_not_pay_off": "Betaler sig ikke",
+          "no_gain": "Ingen gevinst"
+        }
+      },
+      "grid_trading_verdict": {
+        "name": "Handel: konklusion",
+        "state": {
+          "pays_off": "Betaler sig",
+          "does_not_pay_off": "Betaler sig ikke",
+          "no_gain": "Ingen gevinst"
+        }
       }
     },
     "button": {

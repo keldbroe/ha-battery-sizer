@@ -19,7 +19,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, NAME, VERSION
-from .coordinator import BatterySizerCoordinator, CalculationResult, Outcome
+from .coordinator import VERDICTS, BatterySizerCoordinator, CalculationResult, Outcome
 from .engine import Strategy
 
 CURRENCY = "DKK"
@@ -41,8 +41,9 @@ def device_info(entry: ConfigEntry) -> DeviceInfo:
 class OutcomeDescription(SensorEntityDescription):
     """A sensor that reads one number from a strategy's outcome."""
 
-    value: Callable[[Outcome], float | None]
+    value: Callable[[Outcome], float | str | None]
     with_table: bool = False
+    with_payback: bool = False
 
 
 def _metric_descriptions(
@@ -50,6 +51,13 @@ def _metric_descriptions(
 ) -> list[OutcomeDescription]:
     size_key = "recommended_expansion" if expansion else "recommended_size"
     return [
+        OutcomeDescription(
+            key=f"{strategy}_verdict",
+            translation_key=f"{strategy}_verdict",
+            device_class=SensorDeviceClass.ENUM,
+            options=VERDICTS,
+            value=lambda o: o.verdict,
+        ),
         OutcomeDescription(
             key=f"{strategy}_{size_key}",
             translation_key=f"{strategy}_{size_key}",
@@ -74,6 +82,7 @@ def _metric_descriptions(
             native_unit_of_measurement=UnitOfTime.YEARS,
             suggested_display_precision=1,
             value=lambda o: o.payback_years,
+            with_payback=True,
         ),
         OutcomeDescription(
             key=f"{strategy}_net_present_value",
@@ -149,8 +158,8 @@ class OutcomeSensor(_Base):
         return result.outcomes.get(self._strategy) if result else None
 
     @property
-    def native_value(self) -> float | None:
-        """Return the metric, or unknown when no size pays off."""
+    def native_value(self) -> float | str | None:
+        """Return the metric; when nothing pays off, the closest option's."""
         outcome = self._outcome
         if outcome is None:
             return None
@@ -160,12 +169,26 @@ class OutcomeSensor(_Base):
     def extra_state_attributes(self) -> dict[str, Any] | None:
         """On the size sensor: every size tried, for charts and comparison."""
         outcome = self._outcome
-        if outcome is None or not self.entity_description.with_table:
+        if outcome is None:
             return None
+        if self.entity_description.with_payback:
+            return {
+                "within_lifetime": outcome.payback_within_lifetime,
+                "candidate_kwh": outcome.candidate_kwh,
+            }
+        if self.entity_description.with_table:
+            return self._table_attributes(outcome)
+        if self.entity_description.device_class is SensorDeviceClass.ENUM:
+            return None
+        return {"candidate_kwh": outcome.candidate_kwh}
+
+    def _table_attributes(self, outcome: Outcome) -> dict[str, Any]:
         attributes: dict[str, Any] = {
             "strategy": str(self._strategy),
             "expansion": outcome.expansion,
-            "pays_off": outcome.recommended_kwh > 0,
+            "pays_off": outcome.verdict == "pays_off",
+            "verdict": outcome.verdict,
+            "candidate_kwh": outcome.candidate_kwh,
             "investment": outcome.investment,
             "cycles_per_year": outcome.cycles_per_year,
             "sizes": outcome.table,

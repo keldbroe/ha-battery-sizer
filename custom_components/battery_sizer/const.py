@@ -4,7 +4,7 @@ from __future__ import annotations
 
 DOMAIN = "battery_sizer"
 NAME = "Batteri-beregner (DK)"
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 
 # Where the hourly energy comes from.
 CONF_SOURCE = "source"

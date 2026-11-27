@@ -255,6 +255,30 @@
       },
       "grid_trading_net_present_value": {
         "name": "Trading: net present value"
+      },
+      "self_consumption_verdict": {
+        "name": "Own consumption: verdict",
+        "state": {
+          "pays_off": "Pays off",
+          "does_not_pay_off": "Does not pay off",
+          "no_gain": "No gain"
+        }
+      },
+      "solar_trading_verdict": {
+        "name": "Solar and selling: verdict",
+        "state": {
+          "pays_off": "Pays off",
+          "does_not_pay_off": "Does not pay off",
+          "no_gain": "No gain"
+        }
+      },
+      "grid_trading_verdict": {
+        "name": "Trading: verdict",
+        "state": {
+          "pays_off": "Pays off",
+          "does_not_pay_off": "Does not pay off",
+          "no_gain": "No gain"
+        }
       }
     },
     "button": {

@@ -28,18 +28,32 @@ _LOGGER = logging.getLogger(__name__)
 
 # The calculation reads years of history, so once a day is plenty.
 UPDATE_INTERVAL = timedelta(days=1)
+
+VERDICT_PAYS_OFF = "pays_off"
+VERDICT_DOES_NOT_PAY_OFF = "does_not_pay_off"
+VERDICT_NO_GAIN = "no_gain"
+VERDICTS = [VERDICT_PAYS_OFF, VERDICT_DOES_NOT_PAY_OFF, VERDICT_NO_GAIN]
 MIN_HOURS = 24 * 30
 
 
 @dataclass(frozen=True, slots=True)
 class Outcome:
-    """The recommendation for one strategy, in plain numbers for sensors."""
+    """The recommendation for one strategy, in plain numbers for sensors.
+
+    ``recommended_kwh`` is 0 when nothing pays off: the advice is then not
+    to buy. The other numbers still describe the best option tried
+    (``candidate_kwh``), so the user sees how far from paying off it is,
+    and ``verdict`` says which case applies.
+    """
 
     strategy: Strategy
     expansion: bool
     recommended_kwh: float
+    verdict: str
+    candidate_kwh: float | None
     annual_savings: float | None
     payback_years: float | None
+    payback_within_lifetime: bool
     net_present_value: float | None
     investment: float | None
     cycles_per_year: float | None
@@ -163,43 +177,63 @@ def _row(kwh: float, savings: float, economics: Any) -> dict[str, Any]:
 
 
 def _new_outcome(strategy: Strategy, rec: Recommendation) -> Outcome:
-    table = [
-        _row(size.capacity_kwh, size.economics.annual_savings, size.economics)
+    candidates = [
+        (size.capacity_kwh, size.economics.annual_savings, size.economics)
         for size in rec.sizes
         if size.capacity_kwh > 0
     ]
-    best = rec.best
-    if best is None:
-        return Outcome(strategy, False, 0.0, None, None, None, None, None, table)
-    economics = best.economics
-    return Outcome(
-        strategy=strategy,
-        expansion=False,
-        recommended_kwh=best.capacity_kwh,
-        annual_savings=round(economics.annual_savings),
-        payback_years=economics.payback_years,
-        net_present_value=round(economics.net_present_value),
-        investment=round(economics.investment),
-        cycles_per_year=round(economics.annual_cycles),
-        table=table,
-    )
+    best = rec.best.capacity_kwh if rec.best is not None else None
+    return _outcome(strategy, False, candidates, best)
 
 
 def _expansion_outcome(strategy: Strategy, rec: ExpansionRecommendation) -> Outcome:
-    table = [
-        _row(option.added_kwh, option.extra_annual_savings, option.economics)
+    candidates = [
+        (option.added_kwh, option.extra_annual_savings, option.economics)
         for option in rec.options
     ]
-    best = rec.best
-    if best is None:
-        return Outcome(strategy, True, 0.0, None, None, None, None, None, table)
-    economics = best.economics
+    best = rec.best.added_kwh if rec.best is not None else None
+    return _outcome(strategy, True, candidates, best)
+
+
+def _outcome(
+    strategy: Strategy,
+    expansion: bool,
+    candidates: list[tuple[float, float, Any]],
+    best_kwh: float | None,
+) -> Outcome:
+    """Describe the recommendation, or the closest option when none pays off."""
+    table = [_row(kwh, savings, economics) for kwh, savings, economics in candidates]
+    if not candidates:
+        return Outcome(
+            strategy,
+            expansion,
+            0.0,
+            VERDICT_NO_GAIN,
+            None,
+            None,
+            None,
+            False,
+            None,
+            None,
+            None,
+            table,
+        )
+    if best_kwh is not None:
+        kwh, savings, economics = next(c for c in candidates if c[0] == best_kwh)
+        verdict = VERDICT_PAYS_OFF
+    else:
+        kwh, savings, economics = max(candidates, key=lambda c: c[2].net_present_value)
+        verdict = VERDICT_DOES_NOT_PAY_OFF if savings > 0.5 else VERDICT_NO_GAIN
+    payback = economics.investment / savings if savings > 0.5 else None
     return Outcome(
         strategy=strategy,
-        expansion=True,
-        recommended_kwh=best.added_kwh,
-        annual_savings=round(best.extra_annual_savings),
-        payback_years=economics.payback_years,
+        expansion=expansion,
+        recommended_kwh=best_kwh or 0.0,
+        verdict=verdict,
+        candidate_kwh=kwh,
+        annual_savings=round(savings),
+        payback_years=round(payback, 1) if payback is not None else None,
+        payback_within_lifetime=economics.payback_years is not None,
         net_present_value=round(economics.net_present_value),
         investment=round(economics.investment),
         cycles_per_year=round(economics.annual_cycles),

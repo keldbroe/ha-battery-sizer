@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.2
+
+### Changed
+
+- **No more "Unknown" when nothing pays off.** The recommended size (or expansion) still shows 0 kWh, but savings, payback and net present value now show the numbers for the closest option tried (the one with the highest net present value). Its size is in the `candidate_kwh` attribute.
+- Payback is shown even when it is longer than the battery's lifetime. The payback sensor's `within_lifetime` attribute says whether it pays back in time.
+
+### Added
+
+- A **verdict** sensor per strategy: *Pays off*, *Does not pay off* or *No gain*.
+
 ## 0.1.1
 
 ### Fixed
