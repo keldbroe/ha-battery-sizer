@@ -1,0 +1,272 @@
+{
+  "config": {
+    "step": {
+      "source": {
+        "title": "Hvor kommer timeforbruget fra?",
+        "description": "Batteri-beregneren simulerer et batteri på din egen time-for-time-historik i Home Assistant. Vælg **Inverter**, hvis din inverter måler husets forbrug og solproduktionen. Det er det rigtige valg, hvis du allerede har et batteri, fordi elmåleren viser det, dit nuværende batteri allerede gør. Ellers vælg **Elmåler**, for eksempel ElOverblik.",
+        "data": {
+          "source": "Datakilde"
+        },
+        "data_description": {
+          "source": "Beregningen bruger den statistik, Home Assistant gemmer for altid, time for time."
+        }
+      },
+      "energy": {
+        "title": "Energistatistik",
+        "description": "Vælg statistikken med timeforbruget. Det skal være energisensorer eller statistik i kWh, der tæller op, som `sensor.…_total_…` eller ElOverbliks `eloverblik_dk:energy_…`.",
+        "data": {
+          "import_statistic": "Købt fra nettet",
+          "export_statistic": "Solgt til nettet",
+          "load_statistic": "Husets forbrug",
+          "solar_statistic": "Solproduktion"
+        },
+        "data_description": {
+          "import_statistic": "Forbrug fra nettet, for eksempel ElOverbliks D07.",
+          "export_statistic": "Leveret til nettet, for eksempel ElOverbliks D06. Lad den stå tom, hvis du ikke har solceller.",
+          "load_statistic": "Alt hvad huset bruger, fra inverteren.",
+          "solar_statistic": "Alt hvad solcellerne producerer, fra inverteren."
+        }
+      },
+      "prices": {
+        "title": "Priser",
+        "description": "Vælg prisstatistikken. Købsprisen skal være med det hele: spotpris, elselskab, nettarif, afgifter og moms, som integrationen Energi Data Service viser den. Salgsprisen er normalt spotprisen uden moms, for eksempel Nord Pool. Kun timer med begge priser bruges.",
+        "data": {
+          "buy_price_statistic": "Købspris (alt inkluderet)",
+          "sell_price_statistic": "Salgspris (spot)",
+          "sell_deduction": "Fradrag ved salg"
+        },
+        "data_description": {
+          "buy_price_statistic": "kr/kWh med tariffer, afgifter og moms.",
+          "sell_price_statistic": "kr/kWh. Som privat sælger får du ikke moms oveni.",
+          "sell_deduction": "Det dit elselskab og nettet beholder pr. solgt kWh (handelsgebyr og indfødningstarif). Det trækkes fra salgsprisen. Typisk 0,02-0,10 kr/kWh; se din afregning."
+        }
+      },
+      "battery": {
+        "title": "Batteri og inverter",
+        "description": "Indtast dit batteri og din inverter. Har du allerede et batteri, regner beregneren på en **udvidelse**: kun den ekstra besparelse tæller, holdt op mod prisen for de ekstra moduler.",
+        "data": {
+          "existing_kwh": "Nuværende batteri",
+          "power_kw": "Inverterens effekt",
+          "usable_pct": "Brugbar kapacitet",
+          "efficiency_pct": "Virkningsgrad (ind og ud)",
+          "grid_limit_kw": "Hovedsikringens grænse"
+        },
+        "data_description": {
+          "existing_kwh": "0 hvis du ikke har et batteri. Ellers dets nominelle kapacitet.",
+          "power_kw": "Hvor hurtigt batteriet kan lade op og af, begrænset af inverteren (og batteriet). For eksempel 5, 10 eller 12 kW.",
+          "usable_pct": "Hvor meget af den nominelle kapacitet der kan bruges. Typisk 90-95 % for LFP.",
+          "efficiency_pct": "Hvor meget af 1 kWh gemt der kommer tilbage. Typisk 85-92 %.",
+          "grid_limit_kw": "Det mest hovedsikringen tillader fra eller til nettet. 3x25 A er cirka 17 kW. 0 = ingen grænse."
+        }
+      },
+      "costs": {
+        "title": "Priser og levetid",
+        "description": "Indtast hvad batteriet koster. **Batteripris** er prisen for én kWh mere (ekstra moduler). **Anlægspris inkl. batteri** er et tilbud på et helt nyt anlæg; med **batteristørrelsen i prisen** regner beregneren ud, hvad anlægget koster ud over batteriet. Har du allerede et batteri, bruges kun batteriprisen og udvidelsesomkostningen.",
+        "data": {
+          "battery_price_per_kwh": "Batteripris",
+          "system_price": "Anlægspris inkl. batteri",
+          "system_battery_kwh": "Batteristørrelse i anlægsprisen",
+          "expansion_cost": "Udvidelsesomkostning",
+          "lifetime_years": "Levetid",
+          "cycle_life": "Antal cyklusser",
+          "discount_pct": "Rente",
+          "max_kwh": "Største størrelse der prøves",
+          "step_kwh": "Spring mellem størrelser",
+          "history_years": "Historik der bruges"
+        },
+        "data_description": {
+          "battery_price_per_kwh": "kr pr. kWh batteri, for eksempel 12.000 kr for 16 kWh = 750 kr/kWh.",
+          "system_price": "Samlet pris for et nyt anlæg med inverter, batteri og montering. 0 hvis du kun vil sammenligne batteristørrelser.",
+          "system_battery_kwh": "Hvor mange kWh batteri anlægsprisen indeholder.",
+          "expansion_cost": "Engangsbeløb for at montere ekstra moduler på et eksisterende batteri.",
+          "lifetime_years": "Hvor mange år batteriet holder.",
+          "cycle_life": "Hvor mange fulde cyklusser batteriet er godkendt til. Batteriet slutter ved årene eller cyklusserne, hvad der kommer først. Sliddet pr. kWh er batteriprisen delt med antal cyklusser.",
+          "discount_pct": "Hvad penge er værd for dig pr. år, til nutidsværdien. For eksempel en lånerente eller hvad pengene kunne give andre steder.",
+          "max_kwh": "Med et eksisterende batteri: den største udvidelse der prøves.",
+          "step_kwh": "Størrelserne der prøves er 0, spring, 2 x spring og så videre op til den største.",
+          "history_years": "Hvor langt tilbage der læses. Kun timer med både energi og priser bruges."
+        }
+      }
+    },
+    "error": {
+      "missing_energy": "Vælg energistatistikken for den valgte kilde.",
+      "missing_prices": "Vælg både en købspris og en salgspris.",
+      "invalid_battery": "Tjek batteriet: effekten skal være over 0, og brugbar kapacitet og virkningsgrad mellem 50 og 100 %.",
+      "system_price_too_low": "Anlægsprisen er lavere end dens eget batteri ved batteriprisen. Tjek anlægsprisen, batteristørrelsen i prisen eller batteriprisen.",
+      "invalid_costs": "Tjek priserne, levetiden og antal cyklusser.",
+      "invalid_sizes": "Den største størrelse skal være mindst ét spring, og historikken skal være over 0."
+    },
+    "abort": {
+      "already_configured": "Er allerede sat op."
+    }
+  },
+  "options": {
+    "step": {
+      "source": {
+        "title": "Hvor kommer timeforbruget fra?",
+        "description": "Batteri-beregneren simulerer et batteri på din egen time-for-time-historik i Home Assistant. Vælg **Inverter**, hvis din inverter måler husets forbrug og solproduktionen. Det er det rigtige valg, hvis du allerede har et batteri, fordi elmåleren viser det, dit nuværende batteri allerede gør. Ellers vælg **Elmåler**, for eksempel ElOverblik.",
+        "data": {
+          "source": "Datakilde"
+        },
+        "data_description": {
+          "source": "Beregningen bruger den statistik, Home Assistant gemmer for altid, time for time."
+        }
+      },
+      "energy": {
+        "title": "Energistatistik",
+        "description": "Vælg statistikken med timeforbruget. Det skal være energisensorer eller statistik i kWh, der tæller op, som `sensor.…_total_…` eller ElOverbliks `eloverblik_dk:energy_…`.",
+        "data": {
+          "import_statistic": "Købt fra nettet",
+          "export_statistic": "Solgt til nettet",
+          "load_statistic": "Husets forbrug",
+          "solar_statistic": "Solproduktion"
+        },
+        "data_description": {
+          "import_statistic": "Forbrug fra nettet, for eksempel ElOverbliks D07.",
+          "export_statistic": "Leveret til nettet, for eksempel ElOverbliks D06. Lad den stå tom, hvis du ikke har solceller.",
+          "load_statistic": "Alt hvad huset bruger, fra inverteren.",
+          "solar_statistic": "Alt hvad solcellerne producerer, fra inverteren."
+        }
+      },
+      "prices": {
+        "title": "Priser",
+        "description": "Vælg prisstatistikken. Købsprisen skal være med det hele: spotpris, elselskab, nettarif, afgifter og moms, som integrationen Energi Data Service viser den. Salgsprisen er normalt spotprisen uden moms, for eksempel Nord Pool. Kun timer med begge priser bruges.",
+        "data": {
+          "buy_price_statistic": "Købspris (alt inkluderet)",
+          "sell_price_statistic": "Salgspris (spot)",
+          "sell_deduction": "Fradrag ved salg"
+        },
+        "data_description": {
+          "buy_price_statistic": "kr/kWh med tariffer, afgifter og moms.",
+          "sell_price_statistic": "kr/kWh. Som privat sælger får du ikke moms oveni.",
+          "sell_deduction": "Det dit elselskab og nettet beholder pr. solgt kWh (handelsgebyr og indfødningstarif). Det trækkes fra salgsprisen. Typisk 0,02-0,10 kr/kWh; se din afregning."
+        }
+      },
+      "battery": {
+        "title": "Batteri og inverter",
+        "description": "Indtast dit batteri og din inverter. Har du allerede et batteri, regner beregneren på en **udvidelse**: kun den ekstra besparelse tæller, holdt op mod prisen for de ekstra moduler.",
+        "data": {
+          "existing_kwh": "Nuværende batteri",
+          "power_kw": "Inverterens effekt",
+          "usable_pct": "Brugbar kapacitet",
+          "efficiency_pct": "Virkningsgrad (ind og ud)",
+          "grid_limit_kw": "Hovedsikringens grænse"
+        },
+        "data_description": {
+          "existing_kwh": "0 hvis du ikke har et batteri. Ellers dets nominelle kapacitet.",
+          "power_kw": "Hvor hurtigt batteriet kan lade op og af, begrænset af inverteren (og batteriet). For eksempel 5, 10 eller 12 kW.",
+          "usable_pct": "Hvor meget af den nominelle kapacitet der kan bruges. Typisk 90-95 % for LFP.",
+          "efficiency_pct": "Hvor meget af 1 kWh gemt der kommer tilbage. Typisk 85-92 %.",
+          "grid_limit_kw": "Det mest hovedsikringen tillader fra eller til nettet. 3x25 A er cirka 17 kW. 0 = ingen grænse."
+        }
+      },
+      "costs": {
+        "title": "Priser og levetid",
+        "description": "Indtast hvad batteriet koster. **Batteripris** er prisen for én kWh mere (ekstra moduler). **Anlægspris inkl. batteri** er et tilbud på et helt nyt anlæg; med **batteristørrelsen i prisen** regner beregneren ud, hvad anlægget koster ud over batteriet. Har du allerede et batteri, bruges kun batteriprisen og udvidelsesomkostningen.",
+        "data": {
+          "battery_price_per_kwh": "Batteripris",
+          "system_price": "Anlægspris inkl. batteri",
+          "system_battery_kwh": "Batteristørrelse i anlægsprisen",
+          "expansion_cost": "Udvidelsesomkostning",
+          "lifetime_years": "Levetid",
+          "cycle_life": "Antal cyklusser",
+          "discount_pct": "Rente",
+          "max_kwh": "Største størrelse der prøves",
+          "step_kwh": "Spring mellem størrelser",
+          "history_years": "Historik der bruges"
+        },
+        "data_description": {
+          "battery_price_per_kwh": "kr pr. kWh batteri, for eksempel 12.000 kr for 16 kWh = 750 kr/kWh.",
+          "system_price": "Samlet pris for et nyt anlæg med inverter, batteri og montering. 0 hvis du kun vil sammenligne batteristørrelser.",
+          "system_battery_kwh": "Hvor mange kWh batteri anlægsprisen indeholder.",
+          "expansion_cost": "Engangsbeløb for at montere ekstra moduler på et eksisterende batteri.",
+          "lifetime_years": "Hvor mange år batteriet holder.",
+          "cycle_life": "Hvor mange fulde cyklusser batteriet er godkendt til. Batteriet slutter ved årene eller cyklusserne, hvad der kommer først. Sliddet pr. kWh er batteriprisen delt med antal cyklusser.",
+          "discount_pct": "Hvad penge er værd for dig pr. år, til nutidsværdien. For eksempel en lånerente eller hvad pengene kunne give andre steder.",
+          "max_kwh": "Med et eksisterende batteri: den største udvidelse der prøves.",
+          "step_kwh": "Størrelserne der prøves er 0, spring, 2 x spring og så videre op til den største.",
+          "history_years": "Hvor langt tilbage der læses. Kun timer med både energi og priser bruges."
+        }
+      }
+    },
+    "error": {
+      "missing_energy": "Vælg energistatistikken for den valgte kilde.",
+      "missing_prices": "Vælg både en købspris og en salgspris.",
+      "invalid_battery": "Tjek batteriet: effekten skal være over 0, og brugbar kapacitet og virkningsgrad mellem 50 og 100 %.",
+      "system_price_too_low": "Anlægsprisen er lavere end dens eget batteri ved batteriprisen. Tjek anlægsprisen, batteristørrelsen i prisen eller batteriprisen.",
+      "invalid_costs": "Tjek priserne, levetiden og antal cyklusser.",
+      "invalid_sizes": "Den største størrelse skal være mindst ét spring, og historikken skal være over 0."
+    }
+  },
+  "selector": {
+    "source": {
+      "options": {
+        "inverter": "Inverter: husets forbrug og solproduktion",
+        "grid": "Elmåler: købt og solgt (fx ElOverblik)"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "last_calculation": {
+        "name": "Seneste beregning"
+      },
+      "self_consumption_recommended_size": {
+        "name": "Eget forbrug: anbefalet batteri"
+      },
+      "self_consumption_recommended_expansion": {
+        "name": "Eget forbrug: anbefalet udvidelse"
+      },
+      "self_consumption_annual_savings": {
+        "name": "Eget forbrug: besparelse pr. år"
+      },
+      "self_consumption_payback": {
+        "name": "Eget forbrug: tilbagebetalingstid"
+      },
+      "self_consumption_net_present_value": {
+        "name": "Eget forbrug: nutidsværdi"
+      },
+      "solar_trading_recommended_size": {
+        "name": "Sol og salg: anbefalet batteri"
+      },
+      "solar_trading_recommended_expansion": {
+        "name": "Sol og salg: anbefalet udvidelse"
+      },
+      "solar_trading_annual_savings": {
+        "name": "Sol og salg: besparelse pr. år"
+      },
+      "solar_trading_payback": {
+        "name": "Sol og salg: tilbagebetalingstid"
+      },
+      "solar_trading_net_present_value": {
+        "name": "Sol og salg: nutidsværdi"
+      },
+      "grid_trading_recommended_size": {
+        "name": "Handel: anbefalet batteri"
+      },
+      "grid_trading_recommended_expansion": {
+        "name": "Handel: anbefalet udvidelse"
+      },
+      "grid_trading_annual_savings": {
+        "name": "Handel: besparelse pr. år"
+      },
+      "grid_trading_payback": {
+        "name": "Handel: tilbagebetalingstid"
+      },
+      "grid_trading_net_present_value": {
+        "name": "Handel: nutidsværdi"
+      }
+    },
+    "button": {
+      "calculate": {
+        "name": "Beregn igen"
+      }
+    }
+  },
+  "services": {
+    "calculate": {
+      "name": "Beregn",
+      "description": "Læs historikken igen og beregn det anbefalede batteri for hver strategi."
+    }
+  }
+}

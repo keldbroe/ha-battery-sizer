@@ -1,0 +1,13 @@
+{
+  "entity": {
+    "button": {
+      "calculate": { "default": "mdi:calculator-variant" }
+    },
+    "sensor": {
+      "last_calculation": { "default": "mdi:clock-check-outline" }
+    }
+  },
+  "services": {
+    "calculate": { "service": "mdi:calculator-variant" }
+  }
+}
