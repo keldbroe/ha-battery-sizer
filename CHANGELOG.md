@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0
+
+### Added
+
+- **Change the assumptions in the panel.** A new *Forudsætninger* (Assumptions) section lists the battery, inverter, prices, lifetime, interest and sizes to try. **Save and calculate** stores them and calculates again; the last result stays on screen until the new one is ready.
+  - Labels, help texts and limits are the same as in the setup, in your language.
+  - Values are checked as you type, and decimal commas work.
+  - Only an administrator can save; others see the values read-only.
+- Websocket commands `battery_sizer/settings` and `battery_sizer/update_settings` (admin only).
+
 ## 0.2.0
 
 ### Added

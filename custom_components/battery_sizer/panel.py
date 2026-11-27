@@ -10,11 +10,14 @@ from homeassistant.components import websocket_api
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import selector
+from homeassistant.helpers.translation import async_get_translations
 
-from .const import DOMAIN, NAME, VERSION
+from .config_flow import battery_schema, costs_schema, prices_schema
+from .const import DEFAULTS, DOMAIN, NAME, VERSION
 from .coordinator import BatterySizerCoordinator, CalculationResult
 from .engine import Strategy
-from .settings import SettingsError
+from .settings import Settings, SettingsError
 
 PANEL_URL_PATH = "battery-sizer"
 PANEL_COMPONENT = "battery-sizer-panel"
@@ -22,6 +25,8 @@ PANEL_ICON = "mdi:battery-charging-high"
 STATIC_URL = f"/{DOMAIN}_static"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 WS_RESULTS = f"{DOMAIN}/results"
+WS_SETTINGS = f"{DOMAIN}/settings"
+WS_UPDATE_SETTINGS = f"{DOMAIN}/update_settings"
 
 _PANEL_KEY = f"{DOMAIN}_panel"
 _STATIC_KEY = f"{DOMAIN}_static_path"
@@ -31,6 +36,8 @@ _STATIC_KEY = f"{DOMAIN}_static_path"
 def async_register_websocket(hass: HomeAssistant) -> None:
     """Register the command that returns every entry's result."""
     websocket_api.async_register_command(hass, ws_results)
+    websocket_api.async_register_command(hass, ws_settings)
+    websocket_api.async_register_command(hass, ws_update_settings)
 
 
 @websocket_api.websocket_command({vol.Required("type"): WS_RESULTS})
@@ -152,3 +159,139 @@ def async_remove_panel(hass: HomeAssistant) -> None:
 
     frontend.async_remove_panel(hass, PANEL_URL_PATH)
     hass.data[_PANEL_KEY] = False
+
+
+# ---------- settings that can be changed from the panel ----------
+
+
+def editable_groups() -> list[tuple[str, dict[str, selector.NumberSelector]]]:
+    """The number fields of the setup pages, by page.
+
+    The statistics are left out: they are picked once in the setup. The
+    limits and units come from the same selectors the setup uses.
+    """
+    groups: list[tuple[str, dict[str, selector.NumberSelector]]] = []
+    for step, schema in (
+        ("battery", battery_schema()),
+        ("prices", prices_schema()),
+        ("costs", costs_schema()),
+    ):
+        fields = {
+            str(key): value
+            for key, value in schema.schema.items()
+            if isinstance(value, selector.NumberSelector)
+        }
+        groups.append((step, fields))
+    return groups
+
+
+def _editable_fields() -> dict[str, selector.NumberSelector]:
+    return {
+        key: field for _, fields in editable_groups() for key, field in fields.items()
+    }
+
+
+def _entry(hass: HomeAssistant, entry_id: str):
+    entry = hass.config_entries.async_get_entry(entry_id)
+    if entry is None or entry.domain != DOMAIN:
+        return None
+    return entry
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): WS_SETTINGS,
+        vol.Optional("language"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_settings(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Return the fields the panel can change, with labels in the user's language."""
+    language = msg.get("language") or hass.config.language
+    texts = await async_get_translations(hass, language, "config", [DOMAIN])
+    prefix = f"component.{DOMAIN}.config"
+    entries: dict[str, Any] = {}
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        values = {**DEFAULTS, **entry.data, **entry.options}
+        groups = []
+        for step, fields in editable_groups():
+            groups.append(
+                {
+                    "key": step,
+                    "title": texts.get(f"{prefix}.step.{step}.title", step),
+                    "fields": [
+                        {
+                            "key": key,
+                            "label": texts.get(f"{prefix}.step.{step}.data.{key}", key),
+                            "description": texts.get(
+                                f"{prefix}.step.{step}.data_description.{key}", ""
+                            ),
+                            "min": field.config.get("min"),
+                            "max": field.config.get("max"),
+                            "step": field.config.get("step"),
+                            "unit": field.config.get("unit_of_measurement"),
+                            "value": values.get(key),
+                        }
+                        for key, field in fields.items()
+                    ],
+                }
+            )
+        entries[entry.entry_id] = {"groups": groups}
+    errors = {
+        key.rsplit(".", 1)[-1]: text
+        for key, text in texts.items()
+        if key.startswith(f"{prefix}.error.")
+    }
+    connection.send_result(
+        msg["id"],
+        {
+            "entries": entries,
+            "errors": errors,
+            "can_edit": bool(connection.user and connection.user.is_admin),
+        },
+    )
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): WS_UPDATE_SETTINGS,
+        vol.Required("entry_id"): str,
+        vol.Required("values"): dict,
+    }
+)
+@websocket_api.require_admin
+@callback
+def ws_update_settings(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Save new values and calculate again (the entry reloads)."""
+    entry = _entry(hass, msg["entry_id"])
+    if entry is None:
+        connection.send_error(msg["id"], "not_found", "Unknown entry")
+        return
+    fields = _editable_fields()
+    values: dict[str, Any] = {}
+    for key, value in msg["values"].items():
+        field = fields.get(key)
+        if field is None:
+            connection.send_error(msg["id"], "invalid_format", f"Cannot change {key}")
+            return
+        try:
+            values[key] = field(value)
+        except vol.Invalid as err:
+            connection.send_error(msg["id"], "out_of_range", f"{key}: {err}")
+            return
+    options = {**entry.data, **entry.options, **values}
+    try:
+        Settings.from_mapping(options).validate()
+    except SettingsError as err:
+        connection.send_error(msg["id"], "invalid_settings", err.key)
+        return
+    changed = hass.config_entries.async_update_entry(entry, options=options)
+    connection.send_result(msg["id"], {"changed": changed})

@@ -62,6 +62,8 @@ Integrationen tilføjer **Batteri-beregner** i sidepanelet. Det viser:
 - energien gennem batteriet pr. måned: leveret til hjemmet, solgt og ladet fra nettet
 - en tabel med alle størrelser
 
+Under **Forudsætninger** kan du ændre tallene direkte i panelet: batteri og inverter, priser, levetid, rente og hvilke størrelser der prøves. **Gem og beregn** gemmer dem i integrationens indstillinger og regner igen. Kun en administrator kan gemme. Statistikkerne (energi og priser) vælges stadig under integrationens indstillinger.
+
 Knappen **Beregn igen** kører beregningen med det samme.
 
 ### Hvad den beregner
@@ -179,6 +181,8 @@ The integration adds **Batteri-beregner** to the sidebar. It shows:
 - the savings per month of a typical year
 - the energy through the battery per month: delivered to the home, sold, and charged from the grid
 - a table of every size
+
+Under **Assumptions** you can change the numbers right in the panel: battery and inverter, prices, lifetime, interest, and which sizes to try. **Save and calculate** stores them in the integration's settings and calculates again. Only an administrator can save. The statistics (energy and prices) are still picked in the integration's settings.
 
 The **Calculate again** button runs the calculation right away.
 
