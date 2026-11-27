@@ -310,3 +310,95 @@ async def test_panel_is_added_with_the_frontend_and_removed_with_the_entry(
     await hass.async_block_till_done(wait_background_tasks=True)
     assert register.await_count == 2
     hass.http.async_register_static_paths.assert_awaited_once()
+
+
+async def test_settings_command_lists_the_fields_in_danish(
+    hass, loads, hass_ws_client
+) -> None:
+    entry = await _setup(hass)
+    client = await hass_ws_client(hass)
+    await client.send_json(
+        {"id": 1, "type": "battery_sizer/settings", "language": "da"}
+    )
+    reply = await client.receive_json()
+    assert reply["success"]
+    result = reply["result"]
+    assert result["can_edit"] is True
+    groups = result["entries"][entry.entry_id]["groups"]
+    assert [group["key"] for group in groups] == ["battery", "prices", "costs"]
+    fields = {field["key"]: field for group in groups for field in group["fields"]}
+    assert "buy_price_statistic" not in fields
+    assert fields["power_kw"]["label"] == "Inverterens effekt"
+    assert fields["power_kw"]["value"] == 5
+    assert fields["power_kw"]["unit"] == "kW"
+    assert fields["battery_price_per_kwh"]["max"] == 50_000
+    assert "system_price_too_low" in result["errors"]
+
+
+async def test_update_settings_saves_and_calculates_again(
+    hass, loads, hass_ws_client
+) -> None:
+    entry = await _setup(hass)
+    client = await hass_ws_client(hass)
+    await client.send_json(
+        {
+            "id": 1,
+            "type": "battery_sizer/update_settings",
+            "entry_id": entry.entry_id,
+            "values": {"power_kw": 12, "battery_price_per_kwh": 750},
+        }
+    )
+    reply = await client.receive_json()
+    assert reply["success"], reply
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert entry.options["power_kw"] == 12
+    assert entry.options["battery_price_per_kwh"] == 750
+    # Untouched values and the statistics stay.
+    assert entry.options[CONF_LOAD] == "sensor.load_total"
+    assert len(loads) == 2
+    assert loads[-1].power_kw == 12
+
+
+async def test_update_settings_rejects_bad_values(hass, loads, hass_ws_client) -> None:
+    entry = await _setup(hass)
+    client = await hass_ws_client(hass)
+    cases = [
+        ({"power_kw": 0}, "out_of_range"),
+        ({"buy_price_statistic": "sensor.x"}, "invalid_format"),
+        ({CONF_SYSTEM_PRICE: 100, CONF_SYSTEM_KWH: 10}, "invalid_settings"),
+    ]
+    for index, (values, code) in enumerate(cases, start=1):
+        await client.send_json(
+            {
+                "id": index,
+                "type": "battery_sizer/update_settings",
+                "entry_id": entry.entry_id,
+                "values": values,
+            }
+        )
+        reply = await client.receive_json()
+        assert not reply["success"]
+        assert reply["error"]["code"] == code
+    assert entry.options == OPTIONS
+    assert len(loads) == 1
+
+
+async def test_only_an_admin_can_change_settings(
+    hass, loads, hass_ws_client, hass_read_only_access_token
+) -> None:
+    entry = await _setup(hass)
+    client = await hass_ws_client(hass, hass_read_only_access_token)
+    await client.send_json({"id": 1, "type": "battery_sizer/settings"})
+    reply = await client.receive_json()
+    assert reply["result"]["can_edit"] is False
+    await client.send_json(
+        {
+            "id": 2,
+            "type": "battery_sizer/update_settings",
+            "entry_id": entry.entry_id,
+            "values": {"power_kw": 12},
+        }
+    )
+    reply = await client.receive_json()
+    assert reply["error"]["code"] == "unauthorized"
+    assert entry.options == OPTIONS

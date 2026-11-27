@@ -62,6 +62,15 @@ const TEXT = {
     noData: "Ingen data",
     months: ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"],
     note: "Tallene for en størrelse, der ikke betaler sig, viser hvor langt den er fra at betale sig.",
+    assumptions: "Forudsætninger",
+    save: "Gem og beregn",
+    saving: "Gemmer …",
+    undo: "Fortryd",
+    recalculating: "Beregner med de nye værdier …",
+    adminOnly: "Kun en administrator kan ændre værdierne.",
+    outOfRange: "Skal være mellem {min} og {max}",
+    notNumber: "Skriv et tal",
+    changed: "ændret",
   },
   en: {
     title: "Battery sizer",
@@ -77,7 +86,7 @@ const TEXT = {
     existing: "Current battery",
     strategies: {
       self_consumption: "Own consumption",
-      solar_trading: "Solar and selling",
+      solar_trading: "Solar and sale",
       grid_trading: "Trading",
     },
     verdicts: {
@@ -111,6 +120,15 @@ const TEXT = {
     noData: "No data",
     months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
     note: "For a size that does not pay off, the numbers show how far it is from paying off.",
+    assumptions: "Assumptions",
+    save: "Save and calculate",
+    saving: "Saving …",
+    undo: "Undo",
+    recalculating: "Calculating with the new values …",
+    adminOnly: "Only an administrator can change the values.",
+    outOfRange: "Must be between {min} and {max}",
+    notNumber: "Enter a number",
+    changed: "changed",
   },
 };
 
@@ -156,6 +174,12 @@ class BatterySizerPanel extends HTMLElement {
     this._busy = false;
     this._loading = false;
     this._statusSeen = {};
+    this._settings = null;
+    this._draft = {};
+    this._settingsOpen = false;
+    this._saving = false;
+    this._saveError = null;
+    this._pendingSince = undefined;
   }
 
   set hass(hass) {
@@ -256,7 +280,24 @@ class BatterySizerPanel extends HTMLElement {
     if (!this._hass || this._loading) return;
     this._loading = true;
     try {
-      this._data = await this._hass.callWS({ type: "battery_sizer/results" });
+      const previous = this._data;
+      const data = await this._hass.callWS({ type: "battery_sizer/results" });
+      if (this._pendingSince !== undefined) {
+        // While the entry reloads, keep showing the last result.
+        const entry = data.entries[this._entryIndex] || data.entries[0];
+        const done = entry?.result && entry.result.calculated_at !== this._pendingSince;
+        const failed = entry && !entry.last_run_succeeded && entry.error;
+        if (done || failed) {
+          this._pendingSince = undefined;
+        } else if (previous) {
+          for (const item of data.entries) {
+            const old = previous.entries.find((e) => e.entry_id === item.entry_id);
+            if (!item.result && old?.result) item.result = old.result;
+          }
+        }
+      }
+      this._data = data;
+      if (!this._settings) await this._fetchSettings();
       this._error = null;
       for (const entry of this._data.entries) {
         const state = entry.status_entity && this._hass.states[entry.status_entity];
@@ -270,6 +311,115 @@ class BatterySizerPanel extends HTMLElement {
       this._loading = false;
     }
     this._render();
+  }
+
+  async _fetchSettings() {
+    try {
+      this._settings = await this._hass.callWS({
+        type: "battery_sizer/settings",
+        language: this._locale,
+      });
+    } catch (err) {
+      this._settings = null;
+    }
+  }
+
+  _decimalSeparator() {
+    return new Intl.NumberFormat(this._locale).format(1.5).includes(",") ? "," : ".";
+  }
+
+  _formatInput(value) {
+    if (value === null || value === undefined || value === "") return "";
+    return new Intl.NumberFormat(this._locale, { useGrouping: false, maximumFractionDigits: 3 }).format(value);
+  }
+
+  _parseInput(text) {
+    let clean = String(text).trim().replace(/\s/g, "");
+    if (!clean) return NaN;
+    if (this._decimalSeparator() === ",") clean = clean.replace(/\./g, "").replace(",", ".");
+    else clean = clean.replace(/,/g, "");
+    const value = Number(clean);
+    return Number.isFinite(value) ? value : NaN;
+  }
+
+  _fieldError(field, text) {
+    const t = this._t;
+    const value = this._parseInput(text);
+    if (Number.isNaN(value)) return t.notNumber;
+    if ((field.min !== null && value < field.min) || (field.max !== null && value > field.max)) {
+      return t.outOfRange.replace("{min}", this._formatInput(field.min)).replace("{max}", this._formatInput(field.max));
+    }
+    return null;
+  }
+
+  _settingsFor(entry) {
+    return this._settings?.entries?.[entry.entry_id];
+  }
+
+  _draftValues(entry) {
+    const settings = this._settingsFor(entry);
+    const values = {};
+    let valid = true;
+    if (!settings) return { values, valid: false };
+    for (const group of settings.groups) {
+      for (const field of group.fields) {
+        const text = this._draft[field.key];
+        if (text === undefined) continue;
+        if (this._fieldError(field, text)) {
+          valid = false;
+          continue;
+        }
+        const value = this._parseInput(text);
+        if (value !== field.value) values[field.key] = value;
+      }
+    }
+    return { values, valid };
+  }
+
+  async _save(entry) {
+    const { values, valid } = this._draftValues(entry);
+    if (!valid || !Object.keys(values).length || this._saving) return;
+    this._saving = true;
+    this._saveError = null;
+    this._render();
+    const before = entry.result?.calculated_at ?? null;
+    try {
+      await this._hass.callWS({ type: "battery_sizer/update_settings", entry_id: entry.entry_id, values });
+      this._draft = {};
+      this._pendingSince = before;
+      await this._fetchSettings();
+      this._poll(Date.now());
+    } catch (err) {
+      const key = err?.code === "invalid_settings" ? err.message : null;
+      this._saveError = (key && this._settings?.errors?.[key]) || err?.message || String(err);
+    } finally {
+      this._saving = false;
+    }
+    this._render();
+  }
+
+  _poll(started) {
+    clearTimeout(this._pollTimer);
+    if (this._pendingSince === undefined) return;
+    if (Date.now() - started > 180000) {
+      this._pendingSince = undefined;
+      this._render();
+      return;
+    }
+    this._pollTimer = setTimeout(async () => {
+      await this._fetch();
+      this._poll(started);
+    }, 2000);
+  }
+
+  _updateSaveState(entry) {
+    const root = this.shadowRoot;
+    const { values, valid } = this._draftValues(entry);
+    const count = Object.keys(values).length;
+    const save = root.getElementById("save");
+    const undo = root.getElementById("undo");
+    if (save) save.disabled = !valid || !count || this._saving || !this._settings?.can_edit;
+    if (undo) undo.disabled = !Object.keys(this._draft).length;
   }
 
   async _calculate() {
@@ -341,6 +491,43 @@ class BatterySizerPanel extends HTMLElement {
         this._render();
       })
     );
+    const entries = this._data?.entries || [];
+    const entry = entries[Math.min(this._entryIndex, entries.length - 1)];
+    root.getElementById("assumptions")?.addEventListener("toggle", (ev) => {
+      this._settingsOpen = ev.target.open;
+    });
+    root.querySelectorAll("input[data-field]").forEach((input) => {
+      input.addEventListener("input", () => {
+        const key = input.dataset.field;
+        const field = this._settingsFor(entry)?.groups.flatMap((g) => g.fields).find((f) => f.key === key);
+        if (!field) return;
+        this._draft[key] = input.value;
+        const error = this._fieldError(field, input.value);
+        const value = this._parseInput(input.value);
+        const wrap = input.closest(".field");
+        wrap.classList.toggle("invalid", !!error);
+        wrap.classList.toggle("changed", !error && value !== field.value);
+        wrap.querySelector(".field-error").textContent = error || "";
+        this._updateSaveState(entry);
+      });
+      // The help text stays with the last field chosen: hiding it on blur
+      // would move the buttons below while they are being clicked.
+      input.addEventListener("focus", () => {
+        this._activeField = input.dataset.field;
+        root.querySelectorAll(".field.active").forEach((el) => el.classList.remove("active"));
+        input.closest(".field").classList.add("active");
+      });
+      input.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") this._save(entry);
+      });
+    });
+    root.getElementById("save")?.addEventListener("click", () => this._save(entry));
+    root.getElementById("undo")?.addEventListener("click", () => {
+      this._draft = {};
+      this._saveError = null;
+      this._render();
+    });
+    if (entry) this._updateSaveState(entry);
     root.querySelectorAll("[data-strategy]").forEach((el) =>
       el.addEventListener("click", () => {
         this._strategy = el.dataset.strategy;
@@ -365,7 +552,7 @@ class BatterySizerPanel extends HTMLElement {
       : "";
     const result = entry.result;
     if (!result) {
-      return `${picker}${failed}<div class="card message">${t.waiting}</div>`;
+      return `${picker}${failed}${this._assumptionsHtml(entry)}<div class="card message">${t.waiting}</div>`;
     }
     const strategies = STRATEGIES.filter((s) => result.strategies[s]);
     if (!this._strategy || !strategies.includes(this._strategy)) {
@@ -376,6 +563,7 @@ class BatterySizerPanel extends HTMLElement {
       ${picker}
       ${failed}
       ${this._infoHtml(entry, result)}
+      ${this._assumptionsHtml(entry)}
       <div class="cards">${strategies.map((s) => this._strategyCard(entry, s, result.strategies[s])).join("")}</div>
       <div class="card">
         <div class="card-head">
@@ -427,6 +615,68 @@ class BatterySizerPanel extends HTMLElement {
       ${existing}
       <span><b>${t.calculated}:</b> ${escapeHtml(when)}</span>
     </div>`;
+  }
+
+  _unit(unit) {
+    if (unit === "år") return this._t.years;
+    return unit || "";
+  }
+
+  _assumptionsHtml(entry) {
+    const t = this._t;
+    const settings = this._settingsFor(entry);
+    if (!settings) return "";
+    const canEdit = !!this._settings.can_edit;
+    const fields = settings.groups.flatMap((g) => g.fields);
+    const pick = (key) => fields.find((f) => f.key === key);
+    const summary = ["existing_kwh", "power_kw", "battery_price_per_kwh", "lifetime_years"]
+      .map(pick)
+      .filter((f) => f && !(f.key === "existing_kwh" && !f.value))
+      .map((f) => `${this._formatInput(f.value)} ${this._unit(f.unit)}`)
+      .join(" · ");
+    const pending = this._pendingSince !== undefined;
+    const groups = settings.groups
+      .map(
+        (group) => `<fieldset>
+          <legend>${escapeHtml(group.title)}</legend>
+          <div class="fields">${group.fields
+            .map((field) => {
+              const text = this._draft[field.key];
+              const shown = text !== undefined ? text : this._formatInput(field.value);
+              const error = text !== undefined ? this._fieldError(field, text) : null;
+              const changed = text !== undefined && !error && this._parseInput(text) !== field.value;
+              const active = this._activeField === field.key ? "active" : "";
+              return `<label class="field ${active} ${error ? "invalid" : ""} ${changed ? "changed" : ""}">
+                <span class="field-label">${escapeHtml(field.label)}</span>
+                <span class="input-wrap">
+                  <input data-field="${field.key}" type="text" inputmode="decimal" autocomplete="off"
+                    value="${escapeHtml(shown)}" ${canEdit && !pending ? "" : "disabled"}>
+                  ${field.unit ? `<span class="unit">${escapeHtml(this._unit(field.unit))}</span>` : ""}
+                </span>
+                <span class="field-error">${error ? escapeHtml(error) : ""}</span>
+                ${field.description ? `<span class="field-help">${escapeHtml(field.description)}</span>` : ""}
+              </label>`;
+            })
+            .join("")}</div>
+        </fieldset>`
+      )
+      .join("");
+    return `<details class="card assumptions" id="assumptions" ${this._settingsOpen || pending ? "open" : ""}>
+      <summary>
+        <span class="summary-title">${t.assumptions}</span>
+        <span class="summary-values">${escapeHtml(summary)}</span>
+      </summary>
+      ${pending ? `<div class="banner">${t.recalculating}</div>` : ""}
+      ${this._saveError ? `<div class="banner error">${escapeHtml(this._saveError)}</div>` : ""}
+      ${canEdit ? "" : `<p class="note">${t.adminOnly}</p>`}
+      ${groups}
+      ${canEdit
+        ? `<div class="form-actions">
+            <button class="secondary" id="undo">${t.undo}</button>
+            <button class="primary" id="save">${this._saving ? t.saving : t.save}</button>
+          </div>`
+        : ""}
+    </details>`;
   }
 
   _metricName(metric, entry) {
@@ -842,6 +1092,78 @@ const STYLE = `
   th { color: var(--secondary-text-color, #727272); font-weight: 500; }
   tr.shown td { font-weight: 600; background: rgba(127, 127, 127, 0.08); }
   .note { color: var(--secondary-text-color, #727272); font-size: 12px; margin: 8px 0 0; }
+  details.assumptions > summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 12px;
+  }
+  details.assumptions > summary::-webkit-details-marker { display: none; }
+  details.assumptions > summary::before {
+    content: "▸";
+    color: var(--secondary-text-color, #727272);
+    transition: transform 0.15s;
+    display: inline-block;
+  }
+  details.assumptions[open] > summary::before { transform: rotate(90deg); }
+  .summary-title { font-size: 16px; font-weight: 500; }
+  .summary-values { color: var(--secondary-text-color, #727272); font-size: 14px; }
+  fieldset { border: 0; padding: 0; margin: 16px 0 0; min-width: 0; }
+  legend { font-weight: 500; font-size: 14px; padding: 0; margin-bottom: 8px; }
+  .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px 16px; }
+  .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .field-label { font-size: 13px; color: var(--secondary-text-color, #727272); }
+  .input-wrap {
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--divider-color, #e0e0e0);
+    border-radius: 8px;
+    background: var(--secondary-background-color, transparent);
+    padding: 0 10px;
+  }
+  .input-wrap:focus-within { border-color: var(--primary-color, #03a9f4); }
+  .field.changed .input-wrap { border-color: var(--primary-color, #03a9f4); box-shadow: inset 3px 0 0 var(--primary-color, #03a9f4); }
+  .field.invalid .input-wrap { border-color: var(--error-color, #db4437); }
+  input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--primary-text-color, #212121);
+    font: inherit;
+    font-size: 16px;
+    padding: 9px 0;
+    outline: none;
+    font-variant-numeric: tabular-nums;
+  }
+  input:disabled { color: var(--secondary-text-color, #727272); }
+  .unit { color: var(--secondary-text-color, #727272); font-size: 14px; margin-left: 6px; white-space: nowrap; }
+  .field-error { color: var(--error-color, #db4437); font-size: 12px; min-height: 0; }
+  .field-error:empty { display: none; }
+  .field-help { color: var(--secondary-text-color, #727272); font-size: 12px; line-height: 1.35; display: none; }
+  .field.active .field-help { display: block; }
+  .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  .form-actions button {
+    border-radius: 18px;
+    padding: 8px 18px;
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    border: 1px solid var(--primary-color, #03a9f4);
+  }
+  .form-actions .primary { background: var(--primary-color, #03a9f4); color: var(--text-primary-color, #fff); }
+  .form-actions .secondary { background: transparent; color: var(--primary-color, #03a9f4); }
+  .form-actions button:disabled { opacity: 0.45; cursor: default; }
+  .banner {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    background: rgba(127, 127, 127, 0.1);
+  }
+  .banner.error { color: var(--error-color, #db4437); background: rgba(219, 68, 55, 0.08); }
   @media (max-width: 600px) {
     .content { padding: 12px; }
     .title { font-size: 18px; }
