@@ -29,11 +29,27 @@ Each move is checked against power, usable capacity, round-trip efficiency, the 
 
 A typical year averages each calendar month and adds the twelve, so months that appear more often in the data do not count more.
 
+## Prices you type in
+
+| Field | Used for |
+| --- | --- |
+| **Battery price** (kr per kWh) | Every extra kWh, in a new system or an expansion |
+| **System price incl. battery** (kr) and **its battery size** (kWh) | A new system. What it costs besides its battery is the system price minus that battery at the battery price. Other sizes cost that plus their capacity at the battery price. |
+| **Expansion cost** (kr) | A one-off cost for fitting extra modules to an existing battery |
+| **Existing battery** (kWh) | 0 for no battery. Otherwise the calculation is about an *expansion*. |
+
+## New system or expansion
+
+- **New system:** each size's investment is compared with its savings against no battery.
+- **Expansion of an existing battery:** the existing battery is already paid for. Only the *extra* savings from the larger battery count, against the price of the extra modules and the expansion cost. The expansion lasts as long as the larger battery, by years or cycles, whichever ends first.
+
+  Use the inverter's home load and solar production as data. The grid meters already show the effect of the existing battery, which would then be counted twice.
+
 ## Economics
 
-- **Inputs:** price per kWh, fixed cost, lifetime in years and cycles (whichever comes first), and a discount rate.
+- **Inputs:** the prices above, lifetime in years and cycles (whichever comes first), and a discount rate.
 - **Outputs per size:** investment, annual savings, cycles per year, payback time and net present value.
-- **Recommendation:** the size with the highest net present value. No size is recommended if none pays off.
+- **Recommendation:** the size, or the expansion, with the highest net present value. Nothing is recommended if nothing pays off.
 
 ## Data
 

@@ -85,3 +85,101 @@ def recommend(
     ]
     best = max(paying, key=lambda r: r.economics.net_present_value, default=None)
     return Recommendation(strategy=strategy, sizes=results, best=best)
+
+
+@dataclass(frozen=True, slots=True)
+class ExpansionOption:
+    """Adding ``added_kwh`` to the existing battery."""
+
+    added_kwh: float
+    simulation: SimulationResult
+    extra_annual_savings: float
+    economics: Economics
+
+    @property
+    def total_kwh(self) -> float:
+        """Return the battery's capacity after the expansion."""
+        return self.simulation.battery.capacity_kwh
+
+
+@dataclass(frozen=True, slots=True)
+class ExpansionRecommendation:
+    """The existing battery, every expansion tried, and the best one if any."""
+
+    strategy: Strategy
+    existing: SimulationResult
+    options: list[ExpansionOption]
+    best: ExpansionOption | None
+
+    @property
+    def best_added_kwh(self) -> float:
+        """Return the recommended extra capacity, or 0 when none pays off."""
+        return self.best.added_kwh if self.best is not None else 0.0
+
+
+def recommend_expansion(
+    hours: Sequence[Hour],
+    template: Battery,
+    strategy: Strategy,
+    costs: Costs,
+    *,
+    existing_kwh: float,
+    tz: ZoneInfo,
+    added: Iterable[float] | None = None,
+    include_wear: bool = True,
+    progress: Callable[[int, int], None] | None = None,
+) -> ExpansionRecommendation:
+    """Find how much capacity to add to an existing battery, if any.
+
+    The existing battery is already paid for, so only the extra savings
+    count, against the price of the extra modules plus the one-off
+    ``costs.expansion_cost``. ``hours`` should describe the home without
+    any battery (load and solar from the inverter), so the existing battery
+    is simulated too and not counted twice. The expansion lasts as long as
+    the larger battery: its years or cycles, whichever ends first.
+    """
+    if existing_kwh <= 0:
+        raise ValueError("existing_kwh must be positive; use recommend() instead")
+    extra = sorted(
+        {a for a in (added if added is not None else default_sizes()) if a > 0}
+    )
+    wear = (
+        costs.wear_cost_per_kwh(template.round_trip_efficiency)
+        if include_wear
+        else template.wear_cost_per_kwh
+    )
+    total_runs = len(extra) + 1
+
+    def run(capacity: float) -> SimulationResult:
+        battery = replace(template, capacity_kwh=capacity, wear_cost_per_kwh=wear)
+        return simulate(hours, battery, strategy, tz=tz)
+
+    existing = run(existing_kwh)
+    if progress is not None:
+        progress(1, total_runs)
+    options: list[ExpansionOption] = []
+    for done, add in enumerate(extra, start=2):
+        simulation = run(existing_kwh + add)
+        gain = simulation.annual_savings - existing.annual_savings
+        economics = evaluate(
+            add,
+            gain,
+            simulation.annual_cycles,
+            costs,
+            investment=costs.expansion_investment(add),
+        )
+        options.append(
+            ExpansionOption(
+                added_kwh=add,
+                simulation=simulation,
+                extra_annual_savings=gain,
+                economics=economics,
+            )
+        )
+        if progress is not None:
+            progress(done, total_runs)
+    paying = [option for option in options if option.economics.pays_off]
+    best = max(paying, key=lambda o: o.economics.net_present_value, default=None)
+    return ExpansionRecommendation(
+        strategy=strategy, existing=existing, options=options, best=best
+    )

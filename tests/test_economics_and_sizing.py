@@ -15,6 +15,7 @@ from custom_components.battery_sizer.engine import (
     default_sizes,
     evaluate,
     recommend,
+    recommend_expansion,
 )
 from custom_components.battery_sizer.engine.pricing import (
     buy_price,
@@ -259,3 +260,84 @@ def test_current_tariffs_replace_the_recorded_buy_price_by_local_hour() -> None:
     assert rebuilt[0].buy_price == pytest.approx((1.0 + 1.3 + 0.15) * 1.25)
     assert rebuilt[1].buy_price == pytest.approx((0.2 + 0.14 + 0.15) * 1.25)
     assert rebuilt[2].buy_price == 9.9
+
+
+# --- prices you type in, and expansion --------------------------------------
+
+
+def test_system_price_includes_a_battery_and_sets_the_rest_as_fixed() -> None:
+    """A 120,000 kr system with 10 kWh at 3,000 kr/kWh: 90,000 kr besides it."""
+    costs = Costs.from_system_price(120_000, 10, 3000, lifetime_years=12)
+    assert costs.fixed_cost == pytest.approx(90_000)
+    assert costs.lifetime_years == 12
+    assert costs.system_investment(10) == pytest.approx(120_000)
+    assert costs.system_investment(15) == pytest.approx(135_000)
+    assert costs.system_investment(0) == 0
+
+
+def test_system_price_below_its_own_battery_is_rejected() -> None:
+    with pytest.raises(ValueError, match="system price"):
+        Costs.from_system_price(20_000, 10, 3000)
+
+
+def test_expansion_pays_for_modules_and_fitting_only() -> None:
+    costs = Costs(price_per_kwh=2500, fixed_cost=80_000, expansion_cost=3000)
+    assert costs.expansion_investment(5) == pytest.approx(15_500)
+    assert costs.expansion_investment(0) == 0
+
+
+def test_expansion_is_judged_on_extra_savings_only() -> None:
+    """6 kWh of daily surplus: going from 2 to 6 kWh pays, beyond 6 adds nothing."""
+    hours = _summer_days()
+    template = Battery(0, power_kw=5, usable_fraction=1.0, round_trip_efficiency=1.0)
+    costs = Costs(
+        price_per_kwh=100,
+        expansion_cost=0,
+        lifetime_years=10,
+        cycle_life=100_000,
+        discount_rate=0.0,
+    )
+    rec = recommend_expansion(
+        hours,
+        template,
+        Strategy.SELF_CONSUMPTION,
+        costs,
+        existing_kwh=2,
+        tz=TZ,
+        added=[2, 4, 6],
+        include_wear=False,
+    )
+    by_added = {o.added_kwh: o for o in rec.options}
+    assert by_added[2].total_kwh == 4
+    expected = by_added[4].simulation.annual_savings - rec.existing.annual_savings
+    assert by_added[4].extra_annual_savings == pytest.approx(expected)
+    assert by_added[4].economics.investment == pytest.approx(400)
+    # Beyond the 6 kWh surplus (2 + 4) there is nothing more to gain.
+    assert by_added[6].extra_annual_savings == pytest.approx(
+        by_added[4].extra_annual_savings
+    )
+    assert rec.best is by_added[4]
+    assert rec.best_added_kwh == 4
+
+
+def test_no_expansion_is_recommended_when_the_battery_is_already_big() -> None:
+    hours = _summer_days(20)
+    rec = recommend_expansion(
+        hours,
+        Battery(0, power_kw=5, usable_fraction=1.0, round_trip_efficiency=1.0),
+        Strategy.SELF_CONSUMPTION,
+        Costs(price_per_kwh=2500, expansion_cost=2000),
+        existing_kwh=10,
+        tz=TZ,
+        added=[2.5, 5],
+    )
+    assert all(o.extra_annual_savings == pytest.approx(0) for o in rec.options)
+    assert rec.best is None
+    assert rec.best_added_kwh == 0
+
+
+def test_expansion_needs_an_existing_battery() -> None:
+    with pytest.raises(ValueError, match="existing_kwh"):
+        recommend_expansion(
+            [], Battery(0), Strategy.SELF_CONSUMPTION, Costs(), existing_kwh=0, tz=TZ
+        )
