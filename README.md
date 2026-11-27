@@ -1,16 +1,125 @@
 # Batteri-beregner (DK)
 
-Home Assistant integration that recommends a home battery size from your own hourly data and Danish electricity prices. Everything comes from sensors and long-term statistics already in Home Assistant. No external service is called.
+**[Dansk](#dansk) · [English](#english)**
+
+## Dansk
+
+Home Assistant-integration, der anbefaler en batteristørrelse til dit hus ud fra din egen time-for-time-historik og danske elpriser. Har du allerede et batteri, regner den på, om en udvidelse betaler sig. Alt kommer fra sensorer og langtidsstatistik, der allerede findes i Home Assistant. Der kaldes ingen eksterne tjenester.
+
+> **Status:** integrationen (opsætning, beregning og sensorer) virker og er testet. Et panel med grafer og en app (add-on) kommer senere.
+
+### Installer med HACS
+
+1. I HACS: vælg **Custom repositories**, og tilføj `https://github.com/keldbroe/ha-battery-sizer` som **Integration**.
+2. Download **Batteri-beregner (DK)**, og genstart Home Assistant.
+3. Gå til **Indstillinger → Enheder & tjenester → Tilføj integration → Batteri-beregner (DK)**.
+
+### Opsætning
+
+Opsætningen har fem korte sider. Alt kan ændres bagefter under **Konfigurer**.
+
+1. **Datakilde.**
+   - **Inverter:** husets forbrug og solproduktionen. Vælg den, hvis du allerede har et batteri, fordi elmåleren viser det, dit nuværende batteri allerede gør.
+   - **Elmåler:** købt og solgt, for eksempel fra ElOverblik.
+2. **Energistatistik.** Vælges i statistik-vælgeren. Ekstern statistik som `eloverblik_dk:energy_…` kan også vælges.
+3. **Priser.**
+   - **Købspris:** med alt inkluderet, for eksempel Energi Data Service.
+   - **Salgspris:** spotprisen, for eksempel Nord Pool.
+   - **Fradrag ved salg:** det dit elselskab og nettet beholder pr. solgt kWh.
+4. **Batteri og inverter.**
+   - **Nuværende batteri:** 0 hvis du ikke har et. Ellers regner beregneren på en udvidelse.
+   - **Inverterens effekt**, **brugbar kapacitet**, **virkningsgrad** og **hovedsikringens grænse**.
+5. **Priser og levetid.**
+   - **Batteripris** pr. kWh.
+   - **Anlægspris inkl. batteri** og den batteristørrelse, prisen indeholder.
+   - **Udvidelsesomkostning.**
+   - **Levetid** i år og cyklusser, og en **rente**.
+   - Hvilke **størrelser** der prøves, og hvor meget **historik** der bruges.
+
+Beregningen kører i baggrunden efter opsætning, én gang i døgnet, efter hver ændring, og når du trykker **Beregn igen** eller kalder handlingen `battery_sizer.calculate`. Den kræver mindst 30 dage, hvor der er både energi og priser.
+
+### Sensorer
+
+For hver strategi (eget forbrug, sol og salg, handel):
+
+| Sensor | Viser |
+| --- | --- |
+| Anbefalet batteri / anbefalet udvidelse | kWh. 0 når ingen størrelse betaler sig. Attributten `sizes` viser alle størrelser, der er prøvet, med besparelse, investering, tilbagebetalingstid, nutidsværdi og cyklusser, så du kan lave dine egne grafer. |
+| Besparelse pr. år | kr pr. år for den anbefalede størrelse, eller den ekstra besparelse ved udvidelsen |
+| Tilbagebetalingstid | År |
+| Nutidsværdi | kr over levetiden |
+
+**Seneste beregning** (diagnostik) viser hvornår beregningen kørte, hvor mange timer den brugte, og fejlen hvis en kørsel fejlede.
+
+### Hvad den beregner
+
+For en række batteristørrelser simuleres hver time i din historik, og den størrelse, der betaler sig bedst, anbefales. Der er tre strategier:
+
+| Strategi | Batteriet lader fra | Det aflader til |
+| --- | --- | --- |
+| **Eget forbrug** | Kun sol-overskud | Husets eget køb, de dyreste timer først |
+| **Sol og salg** | Kun sol-overskud | Huset eller salg til nettet, hvad der betaler mest |
+| **Handel** | Sol-overskud og nettet | Huset og salg til nettet |
+
+- **Eget forbrug** dækker de dyreste timer først. Om vinteren, når der er lidt overskud, købes de billige timer bare fra nettet.
+- **Handel** tager højde for den danske skævhed. Strøm fra nettet koster fuld pris med tariffer, afgifter og moms. Solgt strøm giver spotprisen minus et lille fradrag og ingen moms. Handel betaler sig derfor kun, når prisforskellen er stor.
+
+### Sådan beslutter simuleringen
+
+Morgendagens priser offentliggøres omkring kl. 13. Hver dag kl. 13 planlægger simuleringen til udgangen af næste døgn og udfører de første 24 timer.
+
+I planen flyttes energi fra en *kilde* til et senere *forbrug*, den største gevinst først:
+- **Kilder:** sol-overskud (værd sin salgspris), nettet (fuld købspris) og det, der allerede er gemt.
+- **Forbrug:** husets køb (købspris) og salg (salgspris).
+
+Hver flytning tjekkes mod effekt, brugbar kapacitet, virkningsgrad, hovedsikringen og slid på batteriet. Sliddet er batteriprisen pr. kWh delt med antal cyklusser. Det forhindrer, at batteriet bruges til en gevinst, der er mindre end sliddet.
+
+Et typisk år er gennemsnittet af hver kalendermåned lagt sammen, så måneder, der optræder oftere i data, ikke tæller mere.
+
+### Priser du taster ind
+
+| Felt | Bruges til |
+| --- | --- |
+| **Batteripris** (kr pr. kWh) | Hver ekstra kWh, både i nyt anlæg og ved udvidelse |
+| **Anlægspris inkl. batteri** (kr) og **batteristørrelse i prisen** (kWh) | Nyt anlæg. Det anlægget koster ud over batteriet, er anlægsprisen minus batteriet ved batteriprisen. Andre størrelser koster det plus deres kapacitet ved batteriprisen. |
+| **Udvidelsesomkostning** (kr) | Engangsbeløb for at montere ekstra moduler på et eksisterende batteri |
+| **Nuværende batteri** (kWh) | 0 for intet batteri. Ellers regner beregneren på en *udvidelse*. |
+
+### Nyt anlæg eller udvidelse
+
+- **Nyt anlæg:** hver størrelses investering sammenlignes med dens besparelse i forhold til intet batteri.
+- **Udvidelse af et eksisterende batteri:** det nuværende batteri er allerede betalt. Kun den *ekstra* besparelse fra det større batteri tæller, holdt op mod prisen for de ekstra moduler og udvidelsesomkostningen. Udvidelsen holder lige så længe som det større batteri, i år eller cyklusser, hvad der kommer først.
+
+  Brug inverterens forbrug og solproduktion som data. Elmålerne viser allerede effekten af det nuværende batteri, som så ville blive talt med to gange.
+
+### Økonomi
+
+- **Input:** priserne ovenfor, levetid i år og cyklusser (hvad der kommer først) og en rente.
+- **Resultat for hver størrelse:** investering, besparelse pr. år, cyklusser pr. år, tilbagebetalingstid og nutidsværdi.
+- **Anbefaling:** den størrelse eller udvidelse, der har den højeste nutidsværdi. Betaler intet sig, anbefales intet.
+
+### Data
+
+| Hvad | Typisk sensor |
+| --- | --- |
+| Købt fra og solgt til nettet | ElOverblik (`eloverblik_dk`) eller inverteren |
+| Husets forbrug og solproduktion (bedst når der allerede er et batteri) | Inverteren, fx Solarman |
+| Købspris med alt inkluderet | Energi Data Service |
+| Spotpris til salg | Nord Pool |
+
+## English
+
+Home Assistant integration that recommends a home battery size from your own hourly data and Danish electricity prices. If you already have a battery, it works out whether expanding it pays off. Everything comes from sensors and long-term statistics already in Home Assistant. No external service is called.
 
 > **Status:** the integration (setup, calculation and sensors) works and is tested. A panel with charts and the add-on come next.
 
-## Install with HACS
+### Install with HACS
 
 1. In HACS, choose **Custom repositories** and add `https://github.com/keldbroe/ha-battery-sizer` as an integration.
 2. Download **Batteri-beregner (DK)** and restart Home Assistant.
 3. Go to **Settings → Devices & services → Add integration → Batteri-beregner (DK)**.
 
-## Set it up
+### Set it up
 
 Setup has five short pages. Everything can be changed later under **Configure**.
 
@@ -34,7 +143,7 @@ Setup has five short pages. Everything can be changed later under **Configure**.
 
 The calculation runs in the background after setup, once a day, after every change, and when you press **Calculate again** or call the `battery_sizer.calculate` action. It needs at least 30 days that have both energy and prices.
 
-## Sensors
+### Sensors
 
 For each strategy (own consumption, solar and sale, trading):
 
@@ -47,7 +156,7 @@ For each strategy (own consumption, solar and sale, trading):
 
 **Last calculation** (diagnostic) shows when the calculation ran, how many hours it used, and the error if a run failed.
 
-## What it calculates
+### What it calculates
 
 For a range of battery sizes, every hour of your history is simulated, and the size that pays best is recommended. There are three strategies:
 
@@ -60,7 +169,7 @@ For a range of battery sizes, every hour of your history is simulated, and the s
 - **Own consumption** covers the most expensive hours first. In winter, when there is little surplus, the cheap hours are simply bought from the grid.
 - **Trading** reflects the Danish asymmetry. Power from the grid costs the full price, with tariffs, taxes and VAT. Power sold earns the spot price minus a small fee and has no VAT. Trading therefore only pays off when the spread is large.
 
-## How the simulation decides
+### How the simulation decides
 
 Day-ahead prices for tomorrow are published around 13:00. Every day at 13:00 the simulation plans until the end of the next day and carries out the first 24 hours.
 
@@ -72,7 +181,7 @@ Each move is checked against power, usable capacity, round-trip efficiency, the 
 
 A typical year averages each calendar month and adds the twelve, so months that appear more often in the data do not count more.
 
-## Prices you type in
+### Prices you type in
 
 | Field | Used for |
 | --- | --- |
@@ -81,20 +190,20 @@ A typical year averages each calendar month and adds the twelve, so months that 
 | **Expansion cost** (kr) | A one-off cost for fitting extra modules to an existing battery |
 | **Existing battery** (kWh) | 0 for no battery. Otherwise the calculation is about an *expansion*. |
 
-## New system or expansion
+### New system or expansion
 
 - **New system:** each size's investment is compared with its savings against no battery.
 - **Expansion of an existing battery:** the existing battery is already paid for. Only the *extra* savings from the larger battery count, against the price of the extra modules and the expansion cost. The expansion lasts as long as the larger battery, by years or cycles, whichever ends first.
 
   Use the inverter's home load and solar production as data. The grid meters already show the effect of the existing battery, which would then be counted twice.
 
-## Economics
+### Economics
 
 - **Inputs:** the prices above, lifetime in years and cycles (whichever comes first), and a discount rate.
 - **Outputs per size:** investment, annual savings, cycles per year, payback time and net present value.
 - **Recommendation:** the size, or the expansion, with the highest net present value. Nothing is recommended if nothing pays off.
 
-## Data
+### Data
 
 | What | Typical sensor |
 | --- | --- |
@@ -103,7 +212,7 @@ A typical year averages each calendar month and adds the twelve, so months that 
 | Buy price with everything included | Energi Data Service |
 | Spot price for selling | Nord Pool |
 
-## Development
+## Development / Udvikling
 
 ```bash
 python3.13 -m venv .venv
@@ -116,6 +225,6 @@ pytest
 
 The engine in `custom_components/battery_sizer/engine/` has no Home Assistant imports. The add-on will use it too.
 
-## License
+## License / Licens
 
-MIT. See [LICENSE](LICENSE).
+MIT. Se / see [LICENSE](LICENSE).
