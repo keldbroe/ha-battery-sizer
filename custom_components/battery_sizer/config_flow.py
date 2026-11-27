@@ -11,6 +11,7 @@ from collections.abc import Mapping
 from typing import Any
 
 import voluptuous as vol
+from homeassistant.components.recorder.statistics import async_list_statistic_ids
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -52,7 +53,54 @@ from .const import (
 )
 from .settings import Settings, SettingsError
 
-STATISTIC = selector.StatisticSelector(selector.StatisticSelectorConfig())
+ENERGY_UNITS = frozenset({"Wh", "kWh", "MWh"})
+PRICE_PER = frozenset({"kWh", "MWh"})
+
+
+async def statistic_choices(hass: Any, kind: str) -> list[selector.SelectOptionDict]:
+    """List the recorder's statistics that fit an energy or a price field.
+
+    A plain drop-down is used instead of Home Assistant's statistic picker,
+    which some frontends cannot show inside a setup dialog. Energy fields
+    list cumulative statistics in Wh, kWh or MWh (sensors and external
+    statistics such as ElOverblik's); price fields list statistics per kWh
+    or MWh. A statistic id can also be typed in.
+    """
+    try:
+        rows = await async_list_statistic_ids(hass)
+    except Exception:
+        return []
+    choices: list[selector.SelectOptionDict] = []
+    for row in rows:
+        statistic_id = str(row.get("statistic_id") or "")
+        unit = str(
+            row.get("statistics_unit_of_measurement")
+            or row.get("display_unit_of_measurement")
+            or ""
+        )
+        if not statistic_id:
+            continue
+        if kind == "energy":
+            fits = unit in ENERGY_UNITS and bool(row.get("has_sum"))
+        else:
+            fits = "/" in unit and unit.rsplit("/", 1)[-1] in PRICE_PER
+        if not fits:
+            continue
+        name = row.get("name")
+        label = f"{name} ({statistic_id})" if name else statistic_id
+        choices.append({"value": statistic_id, "label": f"{label} · {unit}"})
+    return sorted(choices, key=lambda choice: choice["label"].lower())
+
+
+def _statistic(choices: list[selector.SelectOptionDict]) -> selector.SelectSelector:
+    return selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=choices,
+            mode=selector.SelectSelectorMode.DROPDOWN,
+            custom_value=True,
+            sort=False,
+        )
+    )
 
 
 def _number(
@@ -84,29 +132,33 @@ def source_schema() -> vol.Schema:
     )
 
 
-def energy_schema(source: str) -> vol.Schema:
+def energy_schema(
+    source: str, choices: list[selector.SelectOptionDict] | None = None
+) -> vol.Schema:
     """Page 2: the energy statistics for the chosen source."""
+    field = _statistic(choices or [])
     if source == SOURCE_INVERTER:
         return vol.Schema(
             {
-                vol.Required(CONF_LOAD): STATISTIC,
-                vol.Required(CONF_SOLAR): STATISTIC,
+                vol.Required(CONF_LOAD): field,
+                vol.Required(CONF_SOLAR): field,
             }
         )
     return vol.Schema(
         {
-            vol.Required(CONF_IMPORT): STATISTIC,
-            vol.Optional(CONF_EXPORT): STATISTIC,
+            vol.Required(CONF_IMPORT): field,
+            vol.Optional(CONF_EXPORT): field,
         }
     )
 
 
-def prices_schema() -> vol.Schema:
+def prices_schema(choices: list[selector.SelectOptionDict] | None = None) -> vol.Schema:
     """Page 3: buy and sell price statistics, and what is kept back on sale."""
+    field = _statistic(choices or [])
     return vol.Schema(
         {
-            vol.Required(CONF_BUY_PRICE): STATISTIC,
-            vol.Required(CONF_SELL_PRICE): STATISTIC,
+            vol.Required(CONF_BUY_PRICE): field,
+            vol.Required(CONF_SELL_PRICE): field,
             vol.Required(CONF_SELL_DEDUCTION): _number(-2, 2, 0.001, "kr/kWh"),
         }
     )
@@ -177,7 +229,8 @@ class _Pages:
                 self._values.pop(key, None)
             self._values.update(user_input)
             return await self.async_step_prices()
-        return self._form("energy", energy_schema(source), {})
+        choices = await statistic_choices(self.hass, "energy")  # type: ignore[attr-defined]
+        return self._form("energy", energy_schema(source, choices), {})
 
     async def async_step_prices(
         self, user_input: dict[str, Any] | None = None
@@ -186,7 +239,8 @@ class _Pages:
         if user_input is not None:
             self._values.update(user_input)
             return await self.async_step_battery()
-        return self._form("prices", prices_schema(), {})
+        choices = await statistic_choices(self.hass, "price")  # type: ignore[attr-defined]
+        return self._form("prices", prices_schema(choices), {})
 
     async def async_step_battery(
         self, user_input: dict[str, Any] | None = None
