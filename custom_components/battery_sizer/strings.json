@@ -3,7 +3,7 @@
     "step": {
       "source": {
         "title": "Where does the hourly energy come from?",
-        "description": "Batteri-beregner simulates a battery on your own hourly history in Home Assistant. Choose **Inverter** if your inverter reports the home's load and the solar production. That is the right choice if you already have a battery, because the grid meter shows what the existing battery already does. Otherwise choose **Grid meter**, for example ElOverblik.",
+        "description": "Batteri-beregner simulates a battery on your own hourly history in Home Assistant. Choose **Inverter** if your inverter reports the home's load and the solar production. That is the right choice if you already have a battery, because the grid meter shows what the existing battery already does. Otherwise choose **Grid meter**, for example ElOverblik. If the Energy dashboard is set up, its meters and prices are filled in for you and marked with ★ in the lists.",
         "data": {
           "source": "Data source"
         },
@@ -13,7 +13,7 @@
       },
       "energy": {
         "title": "Energy statistics",
-        "description": "Pick the statistics with the hourly energy. They must be energy sensors or statistics in kWh that count up, such as `sensor.…_total_…` or ElOverblik's `eloverblik_dk:energy_…`.",
+        "description": "Pick the statistics with the hourly energy. They must be energy sensors or statistics in kWh that count up, such as `sensor.…_total_…` or ElOverblik's `eloverblik_dk:energy_…`. Statistics marked ★ come from the Energy dashboard. Energy in Wh or MWh is converted to kWh.",
         "data": {
           "import_statistic": "Bought from the grid",
           "export_statistic": "Sold to the grid",
@@ -29,7 +29,7 @@
       },
       "prices": {
         "title": "Prices",
-        "description": "Pick the price statistics. The buy price must include everything: spot price, supplier, grid tariff, taxes and VAT, as the Energi Data Service integration shows it. The sell price is usually the spot price without VAT, for example Nord Pool. Only hours with both prices are used.",
+        "description": "Pick the price statistics. The buy price must include everything: spot price, supplier, grid tariff, taxes and VAT, as the Energi Data Service integration shows it. The sell price is usually the spot price without VAT, for example Nord Pool. Only hours with both prices are used. Prices in kr, DKK or øre per kWh (or per MWh) can be used; prices in euro cannot, because the history has no exchange rate. Statistics marked ★ come from the Energy dashboard. When you go on, the history is loaded and checked.",
         "data": {
           "buy_price_statistic": "Buy price (everything included)",
           "sell_price_statistic": "Sell price (spot)",
@@ -40,6 +40,10 @@
           "sell_price_statistic": "kr/kWh. A private seller gets no VAT on top.",
           "sell_deduction": "What your supplier and the grid keep per kWh sold (supplier fee and feed-in tariff). It is subtracted from the sell price. Typically 0.02-0.10 kr/kWh; see your settlement."
         }
+      },
+      "check": {
+        "title": "Check of your data",
+        "description": "Found **{hours}** hours with both energy and prices, from {first} to {last} ({days} days, {coverage} % of the hours in that period).\n\n- Buy price, average: **{buy} kr/kWh**\n- Sell price after the deduction, average: **{sell} kr/kWh**\n- Bought from the grid without a new battery: **{imported} kWh/day**\n- Sold to the grid: **{exported} kWh/day**\n\n{warnings}\n\nGo on to the battery with the button below. To pick other statistics, close this dialog and start again."
       },
       "battery": {
         "title": "Battery and inverter",
@@ -94,7 +98,10 @@
       "invalid_battery": "Check the battery: power must be above 0, and usable capacity and efficiency between 50 and 100 %.",
       "system_price_too_low": "The system price is lower than its battery at the battery price. Check the system price, its battery size or the battery price.",
       "invalid_costs": "Check the prices, lifetime and cycle life.",
-      "invalid_sizes": "The largest size must be at least one step, and the history must be above 0."
+      "invalid_sizes": "The largest size must be at least one step, and the history must be above 0.",
+      "unsupported_price_unit": "The price {statistic} is in {unit}. Use a price in kr, DKK or øre per kWh or MWh; Nord Pool and Energi Data Service can both show DKK.",
+      "no_history": "Home Assistant has no long-term statistics for: {statistics}. A sensor needs a state class (measurement or total) to keep them; new sensors start keeping them from now on.",
+      "too_little_history": "Only {hours} hours have both energy and prices. At least 720 hours (30 days) are needed; check that the energy and price statistics cover the same period."
     },
     "abort": {
       "already_configured": "Already configured."
@@ -104,7 +111,7 @@
     "step": {
       "source": {
         "title": "Where does the hourly energy come from?",
-        "description": "Batteri-beregner simulates a battery on your own hourly history in Home Assistant. Choose **Inverter** if your inverter reports the home's load and the solar production. That is the right choice if you already have a battery, because the grid meter shows what the existing battery already does. Otherwise choose **Grid meter**, for example ElOverblik.",
+        "description": "Batteri-beregner simulates a battery on your own hourly history in Home Assistant. Choose **Inverter** if your inverter reports the home's load and the solar production. That is the right choice if you already have a battery, because the grid meter shows what the existing battery already does. Otherwise choose **Grid meter**, for example ElOverblik. If the Energy dashboard is set up, its meters and prices are filled in for you and marked with ★ in the lists.",
         "data": {
           "source": "Data source"
         },
@@ -114,7 +121,7 @@
       },
       "energy": {
         "title": "Energy statistics",
-        "description": "Pick the statistics with the hourly energy. They must be energy sensors or statistics in kWh that count up, such as `sensor.…_total_…` or ElOverblik's `eloverblik_dk:energy_…`.",
+        "description": "Pick the statistics with the hourly energy. They must be energy sensors or statistics in kWh that count up, such as `sensor.…_total_…` or ElOverblik's `eloverblik_dk:energy_…`. Statistics marked ★ come from the Energy dashboard. Energy in Wh or MWh is converted to kWh.",
         "data": {
           "import_statistic": "Bought from the grid",
           "export_statistic": "Sold to the grid",
@@ -130,7 +137,7 @@
       },
       "prices": {
         "title": "Prices",
-        "description": "Pick the price statistics. The buy price must include everything: spot price, supplier, grid tariff, taxes and VAT, as the Energi Data Service integration shows it. The sell price is usually the spot price without VAT, for example Nord Pool. Only hours with both prices are used.",
+        "description": "Pick the price statistics. The buy price must include everything: spot price, supplier, grid tariff, taxes and VAT, as the Energi Data Service integration shows it. The sell price is usually the spot price without VAT, for example Nord Pool. Only hours with both prices are used. Prices in kr, DKK or øre per kWh (or per MWh) can be used; prices in euro cannot, because the history has no exchange rate. Statistics marked ★ come from the Energy dashboard. When you go on, the history is loaded and checked.",
         "data": {
           "buy_price_statistic": "Buy price (everything included)",
           "sell_price_statistic": "Sell price (spot)",
@@ -141,6 +148,10 @@
           "sell_price_statistic": "kr/kWh. A private seller gets no VAT on top.",
           "sell_deduction": "What your supplier and the grid keep per kWh sold (supplier fee and feed-in tariff). It is subtracted from the sell price. Typically 0.02-0.10 kr/kWh; see your settlement."
         }
+      },
+      "check": {
+        "title": "Check of your data",
+        "description": "Found **{hours}** hours with both energy and prices, from {first} to {last} ({days} days, {coverage} % of the hours in that period).\n\n- Buy price, average: **{buy} kr/kWh**\n- Sell price after the deduction, average: **{sell} kr/kWh**\n- Bought from the grid without a new battery: **{imported} kWh/day**\n- Sold to the grid: **{exported} kWh/day**\n\n{warnings}\n\nGo on to the battery with the button below. To pick other statistics, close this dialog and start again."
       },
       "battery": {
         "title": "Battery and inverter",
@@ -195,7 +206,10 @@
       "invalid_battery": "Check the battery: power must be above 0, and usable capacity and efficiency between 50 and 100 %.",
       "system_price_too_low": "The system price is lower than its battery at the battery price. Check the system price, its battery size or the battery price.",
       "invalid_costs": "Check the prices, lifetime and cycle life.",
-      "invalid_sizes": "The largest size must be at least one step, and the history must be above 0."
+      "invalid_sizes": "The largest size must be at least one step, and the history must be above 0.",
+      "unsupported_price_unit": "The price {statistic} is in {unit}. Use a price in kr, DKK or øre per kWh or MWh; Nord Pool and Energi Data Service can both show DKK.",
+      "no_history": "Home Assistant has no long-term statistics for: {statistics}. A sensor needs a state class (measurement or total) to keep them; new sensors start keeping them from now on.",
+      "too_little_history": "Only {hours} hours have both energy and prices. At least 720 hours (30 days) are needed; check that the energy and price statistics cover the same period."
     }
   },
   "selector": {
@@ -203,6 +217,18 @@
       "options": {
         "inverter": "Inverter: home load and solar production",
         "grid": "Grid meter: bought and sold (e.g. ElOverblik)"
+      }
+    },
+    "check_warning": {
+      "options": {
+        "ok": "No warnings: the numbers look sensible.",
+        "low_buy_price": "The buy price is below 1 kr/kWh on average. A Danish price with grid tariff, taxes and VAT is usually 1.5 to 5 kr/kWh. If it is the spot price alone, the savings will come out far too low.",
+        "high_buy_price": "The buy price is above 8 kr/kWh on average. Check that it is in kr per kWh and not in øre without a unit.",
+        "sell_above_buy": "The sell price is as high as the buy price or higher. Are the two prices swapped?",
+        "no_import": "Nothing was bought from the grid in the period. Check the energy statistic.",
+        "no_export": "There is no solar surplus or sale in the period. Without it, only trading from the grid can pay. Check the solar or export statistic.",
+        "short_history": "There is less than a year of history. The year is put together from the months there are, so a season that is missing (winter or summer) can make the result too high or too low.",
+        "gaps": "Data is missing for more than a fifth of the hours. Only hours with both energy and prices are used."
       }
     }
   },

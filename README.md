@@ -6,7 +6,7 @@
 
 Home Assistant-integration, der anbefaler en batteristørrelse til dit hus ud fra din egen time-for-time-historik og danske elpriser. Har du allerede et batteri, regner den på, om en udvidelse betaler sig. Alt kommer fra sensorer og langtidsstatistik, der allerede findes i Home Assistant. Der kaldes ingen eksterne tjenester.
 
-> **Status:** integrationen (opsætning, beregning og sensorer) virker og er testet. Et panel med grafer og en app (add-on) kommer senere.
+> **Status:** integrationen (opsætning, beregning, sensorer og panel med grafer) virker og er testet. En app (add-on) kommer måske senere.
 
 ### Installer med HACS
 
@@ -16,20 +16,24 @@ Home Assistant-integration, der anbefaler en batteristørrelse til dit hus ud fr
 
 ### Opsætning
 
-Opsætningen har fem korte sider. Alt kan ændres bagefter under **Konfigurer**.
+Opsætningen har seks korte sider. Alt kan ændres bagefter under **Konfigurer**, og tallene også direkte i panelet.
+
+Har du sat **Energi-dashboardet** op, udfylder opsætningen selv elmåler, solceller og priser derfra. De står øverst i listerne, markeret med ★. Se [Hvilke statistikker skal jeg vælge?](#hvilke-statistikker-skal-jeg-vælge) hvis du er i tvivl.
 
 1. **Datakilde.**
    - **Inverter:** husets forbrug og solproduktionen. Vælg den, hvis du allerede har et batteri, fordi elmåleren viser det, dit nuværende batteri allerede gør.
    - **Elmåler:** købt og solgt, for eksempel fra ElOverblik.
-2. **Energistatistik.** Vælges i statistik-vælgeren. Ekstern statistik som `eloverblik_dk:energy_…` kan også vælges.
+2. **Energistatistik.** Vælges i en liste over alle energistatistikker i Wh, kWh eller MWh. Ekstern statistik som `eloverblik_dk:energy_…` er med.
 3. **Priser.**
    - **Købspris:** med alt inkluderet, for eksempel Energi Data Service.
    - **Salgspris:** spotprisen, for eksempel Nord Pool.
    - **Fradrag ved salg:** det dit elselskab og nettet beholder pr. solgt kWh.
-4. **Batteri og inverter.**
+   - Priser i kr, DKK eller øre pr. kWh eller MWh regnes om. Priser i euro kan ikke bruges.
+4. **Tjek af data.** Historikken hentes, og du ser hvor mange timer der er, perioden, gennemsnitsprisen for køb og salg og hvor meget der købes og sælges pr. dag. Ser noget forkert ud, får du en advarsel, for eksempel hvis købsprisen er uden afgifter, eller hvis priserne er byttet om.
+5. **Batteri og inverter.**
    - **Nuværende batteri:** 0 hvis du ikke har et. Ellers regner beregneren på en udvidelse.
    - **Inverterens effekt**, **brugbar kapacitet**, **virkningsgrad** og **hovedsikringens grænse**.
-5. **Priser og levetid.**
+6. **Priser og levetid.**
    - **Batteripris** pr. kWh.
    - **Anlægspris inkl. batteri** og den batteristørrelse, prisen indeholder.
    - **Udvidelsesomkostning.**
@@ -37,6 +41,30 @@ Opsætningen har fem korte sider. Alt kan ændres bagefter under **Konfigurer**.
    - Hvilke **størrelser** der prøves, og hvor meget **historik** der bruges.
 
 Beregningen kører i baggrunden efter opsætning, én gang i døgnet, efter hver ændring, og når du trykker **Beregn igen** eller kalder handlingen `battery_sizer.calculate`. Den kræver mindst 30 dage, hvor der er både energi og priser.
+
+### Hvilke statistikker skal jeg vælge?
+
+Beregneren bruger Home Assistants **langtidsstatistik**, time for time. En sensor er kun med, hvis den har en tilstandsklasse (`total`, `total_increasing` eller `measurement`), og den har kun historik fra den dag, den blev oprettet. Jo mere historik, jo bedre. Et helt år giver både sommer og vinter.
+
+**Energi: vælg én af to måder**
+
+| Du har | Datakilde | Vælg |
+| --- | --- | --- |
+| ElOverblik | Elmåler | **Købt:** `eloverblik_dk:energy_…` for dit forbrugsmålepunkt. **Solgt:** det for dit produktionsmålepunkt (kun med solceller). |
+| En måler på elmåleren (HAN/P1-port, Tibber Pulse, Shelly EM o.l.) | Elmåler | De to sensorer i kWh, der tæller købt og solgt op, ofte med *import*/*export* eller *consumption*/*production* i navnet. |
+| En inverter med solceller (og evt. batteri) | Inverter | **Husets forbrug:** inverterens samlede forbrug i kWh (*load*, *house consumption*, *forbrug*). **Solproduktion:** den samlede produktion i kWh (*PV*, *yield*, *solar production*). |
+
+Har du **allerede et batteri**, så vælg **Inverter**: elmåleren viser jo det, batteriet allerede gør.
+
+**Har du kun en effekt-sensor i W?** Lav en kWh-tæller: **Indstillinger → Enheder & tjenester → Hjælpere → Opret hjælper → Integral (Riemann-sum)**. Vælg effekt-sensoren, metoden **Venstre**, præfikset **k** og tidsenheden **timer**. Tælleren har kun historik fra nu af, så vent mindst 30 dage, helst længere.
+
+**Priser**
+
+- **Købspris:** prisen med *alt*: spotpris, elselskabets tillæg, nettarif, elafgift og moms. **Energi Data Service** (`sensor.energi_data_service`) kan vise den, når tarifferne er sat op. Tjek at den ligner din elregning, typisk 1,5 til 5 kr/kWh. Er det kun spotprisen, bliver besparelsen alt for lav, og tjek-siden advarer dig.
+- **Salgspris:** spotprisen **uden moms**, for eksempel **Nord Pool** i DKK pr. kWh. Står din pris i euro, så skift den til DKK i Nord Pool-integrationen.
+- **Fradrag ved salg:** se din afregning. Typisk 0,02 til 0,10 kr/kWh.
+
+**Tjek-siden** viser bagefter, om tallene giver mening. Ser noget forkert ud, så luk dialogen og start forfra med andre statistikker.
 
 ### Sensorer
 
@@ -126,7 +154,7 @@ Et typisk år er gennemsnittet af hver kalendermåned lagt sammen, så måneder,
 
 Home Assistant integration that recommends a home battery size from your own hourly data and Danish electricity prices. If you already have a battery, it works out whether expanding it pays off. Everything comes from sensors and long-term statistics already in Home Assistant. No external service is called.
 
-> **Status:** the integration (setup, calculation and sensors) works and is tested. A panel with charts and the add-on come next.
+> **Status:** the integration (setup, calculation, sensors and a panel with charts) works and is tested. An add-on may come later.
 
 ### Install with HACS
 
@@ -136,20 +164,24 @@ Home Assistant integration that recommends a home battery size from your own hou
 
 ### Set it up
 
-Setup has five short pages. Everything can be changed later under **Configure**.
+Setup has six short pages. Everything can be changed later under **Configure**, and the numbers also right in the panel.
+
+If the **Energy dashboard** is set up, the setup fills in the grid meter, solar and prices from it. They come first in the lists, marked ★. See [Which statistics do I pick?](#which-statistics-do-i-pick) if in doubt.
 
 1. **Data source.**
    - **Inverter:** the home's load and the solar production. Use this if you already have a battery, because the grid meter shows what the existing battery does.
    - **Grid meter:** bought and sold, for example ElOverblik.
-2. **Energy statistics.** Pick them in the statistics picker. External statistics such as `eloverblik_dk:energy_…` can be picked too.
+2. **Energy statistics.** Picked from a list of every energy statistic in Wh, kWh or MWh. External statistics such as `eloverblik_dk:energy_…` are included.
 3. **Prices.**
    - **Buy price:** with everything included, for example Energi Data Service.
    - **Sell price:** the spot price, for example Nord Pool.
    - **Deducted on sale:** what your supplier and the grid keep per kWh sold.
-4. **Battery and inverter.**
+   - Prices in kr, DKK or øre per kWh or MWh are converted. Prices in euro cannot be used.
+4. **Check of your data.** The history is loaded, and you see how many hours there are, the period, the average buy and sell price and how much is bought and sold per day. If something looks wrong you get a warning, for example a buy price without taxes or swapped prices.
+5. **Battery and inverter.**
    - **Existing battery:** 0 if none. Otherwise the calculation is about expanding it.
    - **Inverter power**, **usable capacity**, **round-trip efficiency** and the **main fuse limit**.
-5. **Prices and lifetime.**
+6. **Prices and lifetime.**
    - **Battery price** per kWh.
    - **System price incl. battery** and the battery size it includes.
    - **Expansion cost.**
@@ -157,6 +189,30 @@ Setup has five short pages. Everything can be changed later under **Configure**.
    - Which **sizes** to try, and how much **history** to use.
 
 The calculation runs in the background after setup, once a day, after every change, and when you press **Calculate again** or call the `battery_sizer.calculate` action. It needs at least 30 days that have both energy and prices.
+
+### Which statistics do I pick?
+
+The calculation uses Home Assistant's **long-term statistics**, hour by hour. A sensor is only there if it has a state class (`total`, `total_increasing` or `measurement`), and its history starts the day it was created. More history is better; a full year has both summer and winter.
+
+**Energy: pick one of two ways**
+
+| You have | Data source | Pick |
+| --- | --- | --- |
+| ElOverblik | Grid meter | **Bought:** `eloverblik_dk:energy_…` for your consumption metering point. **Sold:** the one for your production metering point (only with solar). |
+| A reader on the electricity meter (HAN/P1 port, Tibber Pulse, Shelly EM and similar) | Grid meter | The two kWh sensors that count bought and sold, often with *import*/*export* or *consumption*/*production* in the name. |
+| An inverter with solar (and maybe a battery) | Inverter | **Home load:** the inverter's total load in kWh (*load*, *house consumption*). **Solar production:** the total production in kWh (*PV*, *yield*, *solar production*). |
+
+If you **already have a battery**, pick **Inverter**: the grid meter shows what that battery already does.
+
+**Only a power sensor in W?** Make a kWh counter: **Settings → Devices & services → Helpers → Create helper → Integral (Riemann sum)**. Pick the power sensor, method **Left**, prefix **k** and time unit **hours**. The counter has history from now on, so wait at least 30 days, longer if you can.
+
+**Prices**
+
+- **Buy price:** the price with *everything*: spot, supplier markup, grid tariff, electricity tax and VAT. **Energi Data Service** (`sensor.energi_data_service`) can show it once its tariffs are set up. Check that it looks like your bill, usually 1.5 to 5 kr/kWh. With the spot price alone the savings come out far too low, and the check page warns you.
+- **Sell price:** the spot price **without VAT**, for example **Nord Pool** in DKK per kWh. If your price is in euro, switch it to DKK in the Nord Pool integration.
+- **Deducted on sale:** see your statement. Usually 0.02 to 0.10 kr/kWh.
+
+The **check page** then shows whether the numbers make sense. If something looks wrong, close the dialog and start again with other statistics.
 
 ### Sensors
 

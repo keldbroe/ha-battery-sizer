@@ -2,6 +2,7 @@
   "domain": "battery_sizer",
   "name": "Batteri-beregner (DK)",
   "after_dependencies": [
+    "energy",
     "frontend",
     "http",
     "panel_custom",
@@ -22,5 +23,5 @@
     "custom_components.battery_sizer"
   ],
   "requirements": [],
-  "version": "0.3.0"
+  "version": "0.4.0"
 }

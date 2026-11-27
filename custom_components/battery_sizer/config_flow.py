@@ -20,7 +20,10 @@ from homeassistant.config_entries import (
 )
 from homeassistant.core import callback
 from homeassistant.helpers import selector
+from homeassistant.helpers.translation import async_get_translations
+from homeassistant.util import dt as dt_util
 
+from .check import Summary, summarize
 from .const import (
     CONF_BATTERY_PRICE,
     CONF_BUY_PRICE,
@@ -51,20 +54,32 @@ from .const import (
     SOURCE_GRID,
     SOURCE_INVERTER,
 )
+from .coordinator import MIN_HOURS
+from .data import LoadedData, async_load_hours
 from .settings import Settings, SettingsError
+from .suggest import async_suggestions
+from .units import UnsupportedPriceUnit, price_factor
 
 ENERGY_UNITS = frozenset({"Wh", "kWh", "MWh"})
-PRICE_PER = frozenset({"kWh", "MWh"})
 
 
-async def statistic_choices(hass: Any, kind: str) -> list[selector.SelectOptionDict]:
+STAR = "★ "
+ENERGY_FIELDS = (CONF_IMPORT, CONF_EXPORT, CONF_LOAD, CONF_SOLAR)
+PRICE_FIELDS = (CONF_BUY_PRICE, CONF_SELL_PRICE)
+
+
+async def statistic_choices(
+    hass: Any, kind: str, starred: set[str] | frozenset[str] = frozenset()
+) -> list[selector.SelectOptionDict]:
     """List the recorder's statistics that fit an energy or a price field.
 
     A plain drop-down is used instead of Home Assistant's statistic picker,
     which some frontends cannot show inside a setup dialog. Energy fields
     list cumulative statistics in Wh, kWh or MWh (sensors and external
-    statistics such as ElOverblik's); price fields list statistics per kWh
-    or MWh. A statistic id can also be typed in.
+    statistics such as ElOverblik's); price fields list statistics in kr,
+    DKK or øre per Wh, kWh or MWh. A statistic id can also be typed in.
+    Statistics in ``starred`` (from the Energy dashboard) come first, marked
+    with a star.
     """
     try:
         rows = await async_list_statistic_ids(hass)
@@ -83,13 +98,22 @@ async def statistic_choices(hass: Any, kind: str) -> list[selector.SelectOptionD
         if kind == "energy":
             fits = unit in ENERGY_UNITS and bool(row.get("has_sum"))
         else:
-            fits = "/" in unit and unit.rsplit("/", 1)[-1] in PRICE_PER
+            # Prices in euro or another currency are left out: they cannot
+            # be turned into kroner without an exchange rate.
+            fits = price_factor(unit) is not None
         if not fits:
             continue
         name = row.get("name")
         label = f"{name} ({statistic_id})" if name else statistic_id
-        choices.append({"value": statistic_id, "label": f"{label} · {unit}"})
-    return sorted(choices, key=lambda choice: choice["label"].lower())
+        star = STAR if statistic_id in starred else ""
+        choices.append({"value": statistic_id, "label": f"{star}{label} · {unit}"})
+    return sorted(
+        choices,
+        key=lambda choice: (
+            choice["value"] not in starred,
+            choice["label"].removeprefix(STAR).lower(),
+        ),
+    )
 
 
 def _statistic(choices: list[selector.SelectOptionDict]) -> selector.SelectSelector:
@@ -195,19 +219,68 @@ def costs_schema() -> vol.Schema:
     )
 
 
+def check_placeholders(
+    summary: Summary, texts: Mapping[str, str], language: str
+) -> dict[str, str]:
+    """The numbers and warnings of the check page, in the given language."""
+    comma = language.lower().startswith(("da", "de", "sv", "nb", "no", "nl", "fr"))
+
+    def number(value: float, digits: int) -> str:
+        text = f"{value:,.{digits}f}"
+        if comma:
+            text = text.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+        return text
+
+    def date(moment) -> str:
+        return dt_util.as_local(moment).date().isoformat() if moment else "-"
+
+    prefix = f"component.{DOMAIN}.selector.check_warning.options"
+    lines = [f"- ⚠️ {texts.get(f'{prefix}.{key}', key)}" for key in summary.warnings]
+    if not lines:
+        lines = [f"✅ {texts.get(f'{prefix}.ok', 'OK')}"]
+    return {
+        "hours": number(summary.hours, 0),
+        "days": number(summary.days, 0),
+        "first": date(summary.first),
+        "last": date(summary.last),
+        "buy": number(summary.buy_price, 2),
+        "sell": number(summary.sell_price, 2),
+        "imported": number(summary.import_per_day, 1),
+        "exported": number(summary.export_per_day, 1),
+        "coverage": number(summary.coverage * 100, 0),
+        "warnings": "\n".join(lines),
+    }
+
+
 class _Pages:
     """The shared pages; ``_values`` collects what has been entered."""
 
     _values: dict[str, Any]
+    _suggested: dict[str, str] | None = None
 
-    def _form(self, step_id: str, schema: vol.Schema, errors: dict[str, str]):
-        suggested = {**DEFAULTS, **self._values}
+    async def _suggestions(self) -> dict[str, str]:
+        """What the Energy dashboard knows, read once per flow."""
+        if self._suggested is None:
+            self._suggested = await async_suggestions(self.hass)  # type: ignore[attr-defined]
+        return self._suggested
+
+    _loaded: LoadedData
+
+    def _form(
+        self,
+        step_id: str,
+        schema: vol.Schema,
+        errors: dict[str, str],
+        placeholders: dict[str, str] | None = None,
+    ):
+        suggested = {**DEFAULTS, **(self._suggested or {}), **self._values}
         return self.async_show_form(  # type: ignore[attr-defined]
             step_id=step_id,
             data_schema=self.add_suggested_values_to_schema(  # type: ignore[attr-defined]
                 schema, suggested
             ),
             errors=errors,
+            description_placeholders=placeholders or None,
         )
 
     async def async_step_source(
@@ -217,6 +290,7 @@ class _Pages:
         if user_input is not None:
             self._values.update(user_input)
             return await self.async_step_energy()
+        await self._suggestions()
         return self._form("source", source_schema(), {})
 
     async def async_step_energy(
@@ -229,18 +303,60 @@ class _Pages:
                 self._values.pop(key, None)
             self._values.update(user_input)
             return await self.async_step_prices()
-        choices = await statistic_choices(self.hass, "energy")  # type: ignore[attr-defined]
+        choices = await self._choices("energy", ENERGY_FIELDS)
         return self._form("energy", energy_schema(source, choices), {})
 
     async def async_step_prices(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Pick the price statistics."""
+        """Pick the price statistics, then look at what they give."""
+        errors: dict[str, str] = {}
+        placeholders: dict[str, str] = {}
         if user_input is not None:
             self._values.update(user_input)
+            settings = Settings.from_mapping(self._values)
+            try:
+                loaded = await async_load_hours(
+                    self.hass,  # type: ignore[attr-defined]
+                    settings,
+                    dt_util.utcnow(),
+                )
+            except UnsupportedPriceUnit as err:
+                errors["base"] = "unsupported_price_unit"
+                placeholders = {"statistic": err.statistic, "unit": err.unit or "-"}
+            else:
+                if loaded.missing:
+                    errors["base"] = "no_history"
+                    placeholders = {"statistics": ", ".join(loaded.missing)}
+                elif len(loaded.hours) < MIN_HOURS:
+                    errors["base"] = "too_little_history"
+                    placeholders = {"hours": str(len(loaded.hours))}
+                else:
+                    self._loaded = loaded
+                    return await self.async_step_check()
+        choices = await self._choices("price", PRICE_FIELDS)
+        return self._form("prices", prices_schema(choices), errors, placeholders)
+
+    async def async_step_check(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Show what the chosen statistics give, with warnings."""
+        if user_input is not None:
             return await self.async_step_battery()
-        choices = await statistic_choices(self.hass, "price")  # type: ignore[attr-defined]
-        return self._form("prices", prices_schema(choices), {})
+        settings = Settings.from_mapping(self._values)
+        summary = summarize(settings, self._loaded)
+        language = str(self.hass.config.language or "en")  # type: ignore[attr-defined]
+        texts = await async_get_translations(
+            self.hass,  # type: ignore[attr-defined]
+            language,
+            "selector",
+            [DOMAIN],
+        )
+        return self.async_show_form(  # type: ignore[attr-defined]
+            step_id="check",
+            data_schema=vol.Schema({}),
+            description_placeholders=check_placeholders(summary, texts, language),
+        )
 
     async def async_step_battery(
         self, user_input: dict[str, Any] | None = None
@@ -271,6 +387,24 @@ class _Pages:
             else:
                 return self._finish()
         return self._form("costs", costs_schema(), errors)
+
+    async def _choices(
+        self, kind: str, fields: tuple[str, ...]
+    ) -> list[selector.SelectOptionDict]:
+        """The drop-down, with the Energy dashboard's statistics first.
+
+        A suggestion the recorder keeps no statistics for (a price sensor
+        without long-term statistics, say) is not pre-filled: it would give
+        no data.
+        """
+        suggested = await self._suggestions()
+        starred = {suggested[key] for key in fields if key in suggested}
+        choices = await statistic_choices(self.hass, kind, starred)  # type: ignore[attr-defined]
+        listed = {choice["value"] for choice in choices}
+        for key in fields:
+            if key in suggested and suggested[key] not in listed:
+                suggested.pop(key)
+        return choices
 
     def _finish(self) -> ConfigFlowResult:
         raise NotImplementedError
