@@ -166,17 +166,29 @@ class SimulationResult:
         """Return how many of the twelve calendar months have data."""
         return len({month for _, month in self.by_month})
 
+    def typical_months(self, pick) -> list[float | None]:
+        """Return a value for each calendar month of a typical year.
+
+        Each month is the average of that month over the years in the
+        history, scaled to the month's full length. A month with no data
+        is ``None``.
+        """
+        months: list[float | None] = []
+        for month in range(1, 13):
+            periods = [t for (_, m), t in self.by_month.items() if m == month]
+            hours = sum(t.hours for t in periods)
+            if hours == 0:
+                months.append(None)
+                continue
+            value = sum(pick(t) for t in periods)
+            # February counts 28.25 days, so the year is 365.25 days long.
+            days = 28.25 if month == 2 else 31.0 if month in _LONG else 30.0
+            months.append(value * (days * 24) / hours)
+        return months
+
     def _typical_year(self, pick) -> float:
         if self.total.hours == 0:
             return 0.0
         if self.months_covered < 12:
             return pick(self.total) * 8760 / self.total.hours
-        year = 0.0
-        for month in range(1, 13):
-            periods = [t for (_, m), t in self.by_month.items() if m == month]
-            hours = sum(t.hours for t in periods)
-            value = sum(pick(t) for t in periods)
-            # February counts 28.25 days, so the year is 365.25 days long.
-            days = 28.25 if month == 2 else 31.0 if month in _LONG else 30.0
-            year += value * (days * 24) / hours
-        return year
+        return sum(value or 0.0 for value in self.typical_months(pick))

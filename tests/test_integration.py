@@ -236,3 +236,77 @@ async def test_too_little_overlap_is_reported(hass, monkeypatch) -> None:
     entry = await _setup(hass)
     error = _state(hass, "last_calculation", entry).attributes["error"]
     assert "30 days" in error
+
+
+async def test_results_command_feeds_the_panel(hass, loads, hass_ws_client) -> None:
+    entry = await _setup(hass)
+    client = await hass_ws_client(hass)
+    await client.send_json({"id": 1, "type": "battery_sizer/results"})
+    reply = await client.receive_json()
+    assert reply["success"]
+    [item] = reply["result"]["entries"]
+    assert item["entry_id"] == entry.entry_id
+    assert item["status_entity"].startswith("sensor.")
+    assert item["lifetime_years"] == 10
+    result = item["result"]
+    assert result["hours"] == 24 * 60
+    own = result["strategies"]["self_consumption"]
+    assert own["verdict"] == "pays_off"
+    assert own["sizes"]
+    assert [row["month"] for row in own["monthly"]] == list(range(1, 13))
+    by_month = {row["month"]: row for row in own["monthly"]}
+    # The history covers May and June only.
+    assert by_month[5]["savings"] > 0
+    assert by_month[5]["delivered_kwh"] > 0
+    assert by_month[1]["savings"] is None
+
+
+async def test_expansion_monthly_counts_only_the_extra(
+    hass, loads, hass_ws_client
+) -> None:
+    await _setup(hass, {**OPTIONS, CONF_EXISTING_KWH: 2})
+    client = await hass_ws_client(hass)
+    await client.send_json({"id": 1, "type": "battery_sizer/results"})
+    reply = await client.receive_json()
+    own = reply["result"]["entries"][0]["result"]["strategies"]["self_consumption"]
+    existing = {row["month"]: row for row in own["existing_monthly"]}
+    extra = {row["month"]: row for row in own["monthly"]}
+    assert existing[5]["savings"] > 0
+    # Only what the added kWh save on top of the 2 kWh already there: May
+    # and June (61 days), scaled to a year, give the extra annual savings.
+    assert extra[5]["savings"] > 0
+    total = sum(row["savings"] or 0 for row in own["monthly"])
+    assert total * 365 / 61 == pytest.approx(own["annual_savings"], rel=0.01)
+
+
+async def test_panel_is_added_with_the_frontend_and_removed_with_the_entry(
+    hass, loads, monkeypatch
+) -> None:
+    from unittest.mock import AsyncMock, MagicMock
+
+    from homeassistant.components import frontend, panel_custom
+
+    register = AsyncMock()
+    remove = MagicMock()
+    monkeypatch.setattr(panel_custom, "async_register_panel", register)
+    monkeypatch.setattr(frontend, "async_remove_panel", remove)
+    hass.http = MagicMock()
+    hass.http.async_register_static_paths = AsyncMock()
+    hass.config.components.add("frontend")
+
+    entry = await _setup(hass)
+    register.assert_awaited_once()
+    assert register.await_args.kwargs["frontend_url_path"] == "battery-sizer"
+    assert register.await_args.kwargs["module_url"].startswith(
+        "/battery_sizer_static/panel.js"
+    )
+    hass.http.async_register_static_paths.assert_awaited_once()
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    remove.assert_called_once_with(hass, "battery-sizer")
+
+    # Set up again: the panel comes back, the static path is not added twice.
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert register.await_count == 2
+    hass.http.async_register_static_paths.assert_awaited_once()
