@@ -3,7 +3,7 @@
     "step": {
       "source": {
         "title": "Hvor kommer timeforbruget fra?",
-        "description": "Batteri-beregneren simulerer et batteri på din egen time-for-time-historik i Home Assistant. Vælg **Inverter**, hvis din inverter måler husets forbrug og solproduktionen. Det er det rigtige valg, hvis du allerede har et batteri, fordi elmåleren viser det, dit nuværende batteri allerede gør. Ellers vælg **Elmåler**, for eksempel ElOverblik.",
+        "description": "Batteri-beregneren simulerer et batteri på din egen time-for-time-historik i Home Assistant. Vælg **Inverter**, hvis din inverter måler husets forbrug og solproduktionen. Det er det rigtige valg, hvis du allerede har et batteri, fordi elmåleren viser det, dit nuværende batteri allerede gør. Ellers vælg **Elmåler**, for eksempel ElOverblik. Er Energi-dashboardet sat op, udfyldes dets målere og priser for dig og markeres med ★ i listerne.",
         "data": {
           "source": "Datakilde"
         },
@@ -13,7 +13,7 @@
       },
       "energy": {
         "title": "Energistatistik",
-        "description": "Vælg statistikken med timeforbruget. Det skal være energisensorer eller statistik i kWh, der tæller op, som `sensor.…_total_…` eller ElOverbliks `eloverblik_dk:energy_…`.",
+        "description": "Vælg statistikken med timeforbruget. Det skal være energisensorer eller statistik i kWh, der tæller op, som `sensor.…_total_…` eller ElOverbliks `eloverblik_dk:energy_…`. Statistik markeret med ★ kommer fra Energi-dashboardet. Energi i Wh eller MWh regnes om til kWh.",
         "data": {
           "import_statistic": "Købt fra nettet",
           "export_statistic": "Solgt til nettet",
@@ -29,7 +29,7 @@
       },
       "prices": {
         "title": "Priser",
-        "description": "Vælg prisstatistikken. Købsprisen skal være med det hele: spotpris, elselskab, nettarif, afgifter og moms, som integrationen Energi Data Service viser den. Salgsprisen er normalt spotprisen uden moms, for eksempel Nord Pool. Kun timer med begge priser bruges.",
+        "description": "Vælg prisstatistikken. Købsprisen skal være med det hele: spotpris, elselskab, nettarif, afgifter og moms, som integrationen Energi Data Service viser den. Salgsprisen er normalt spotprisen uden moms, for eksempel Nord Pool. Kun timer med begge priser bruges. Priser i kr, DKK eller øre pr. kWh (eller pr. MWh) kan bruges; priser i euro kan ikke, fordi historikken ikke har en vekselkurs. Statistik markeret med ★ kommer fra Energi-dashboardet. Når du går videre, hentes historikken og tjekkes.",
         "data": {
           "buy_price_statistic": "Købspris (alt inkluderet)",
           "sell_price_statistic": "Salgspris (spot)",
@@ -40,6 +40,10 @@
           "sell_price_statistic": "kr/kWh. Som privat sælger får du ikke moms oveni.",
           "sell_deduction": "Det dit elselskab og nettet beholder pr. solgt kWh (handelsgebyr og indfødningstarif). Det trækkes fra salgsprisen. Typisk 0,02-0,10 kr/kWh; se din afregning."
         }
+      },
+      "check": {
+        "title": "Tjek af dine data",
+        "description": "Fundet **{hours}** timer med både energi og priser, fra {first} til {last} ({days} dage, {coverage} % af timerne i perioden).\n\n- Købspris i gennemsnit: **{buy} kr/kWh**\n- Salgspris efter fradrag i gennemsnit: **{sell} kr/kWh**\n- Købt fra nettet uden nyt batteri: **{imported} kWh/dag**\n- Solgt til nettet: **{exported} kWh/dag**\n\n{warnings}\n\nGå videre til batteriet med knappen nedenfor. Vil du vælge andre statistikker, så luk dialogen og start forfra."
       },
       "battery": {
         "title": "Batteri og inverter",
@@ -94,7 +98,10 @@
       "invalid_battery": "Tjek batteriet: effekten skal være over 0, og brugbar kapacitet og virkningsgrad mellem 50 og 100 %.",
       "system_price_too_low": "Anlægsprisen er lavere end dens eget batteri ved batteriprisen. Tjek anlægsprisen, batteristørrelsen i prisen eller batteriprisen.",
       "invalid_costs": "Tjek priserne, levetiden og antal cyklusser.",
-      "invalid_sizes": "Den største størrelse skal være mindst ét spring, og historikken skal være over 0."
+      "invalid_sizes": "Den største størrelse skal være mindst ét spring, og historikken skal være over 0.",
+      "unsupported_price_unit": "Prisen {statistic} er i {unit}. Brug en pris i kr, DKK eller øre pr. kWh eller MWh; både Nord Pool og Energi Data Service kan vise DKK.",
+      "no_history": "Home Assistant har ingen langtidsstatistik for: {statistics}. En sensor skal have en tilstandsklasse (measurement eller total) for at gemme den; nye sensorer gemmer den fra nu af.",
+      "too_little_history": "Kun {hours} timer har både energi og priser. Der skal mindst 720 timer (30 dage) til; tjek at energi- og prisstatistikken dækker samme periode."
     },
     "abort": {
       "already_configured": "Er allerede sat op."
@@ -104,7 +111,7 @@
     "step": {
       "source": {
         "title": "Hvor kommer timeforbruget fra?",
-        "description": "Batteri-beregneren simulerer et batteri på din egen time-for-time-historik i Home Assistant. Vælg **Inverter**, hvis din inverter måler husets forbrug og solproduktionen. Det er det rigtige valg, hvis du allerede har et batteri, fordi elmåleren viser det, dit nuværende batteri allerede gør. Ellers vælg **Elmåler**, for eksempel ElOverblik.",
+        "description": "Batteri-beregneren simulerer et batteri på din egen time-for-time-historik i Home Assistant. Vælg **Inverter**, hvis din inverter måler husets forbrug og solproduktionen. Det er det rigtige valg, hvis du allerede har et batteri, fordi elmåleren viser det, dit nuværende batteri allerede gør. Ellers vælg **Elmåler**, for eksempel ElOverblik. Er Energi-dashboardet sat op, udfyldes dets målere og priser for dig og markeres med ★ i listerne.",
         "data": {
           "source": "Datakilde"
         },
@@ -114,7 +121,7 @@
       },
       "energy": {
         "title": "Energistatistik",
-        "description": "Vælg statistikken med timeforbruget. Det skal være energisensorer eller statistik i kWh, der tæller op, som `sensor.…_total_…` eller ElOverbliks `eloverblik_dk:energy_…`.",
+        "description": "Vælg statistikken med timeforbruget. Det skal være energisensorer eller statistik i kWh, der tæller op, som `sensor.…_total_…` eller ElOverbliks `eloverblik_dk:energy_…`. Statistik markeret med ★ kommer fra Energi-dashboardet. Energi i Wh eller MWh regnes om til kWh.",
         "data": {
           "import_statistic": "Købt fra nettet",
           "export_statistic": "Solgt til nettet",
@@ -130,7 +137,7 @@
       },
       "prices": {
         "title": "Priser",
-        "description": "Vælg prisstatistikken. Købsprisen skal være med det hele: spotpris, elselskab, nettarif, afgifter og moms, som integrationen Energi Data Service viser den. Salgsprisen er normalt spotprisen uden moms, for eksempel Nord Pool. Kun timer med begge priser bruges.",
+        "description": "Vælg prisstatistikken. Købsprisen skal være med det hele: spotpris, elselskab, nettarif, afgifter og moms, som integrationen Energi Data Service viser den. Salgsprisen er normalt spotprisen uden moms, for eksempel Nord Pool. Kun timer med begge priser bruges. Priser i kr, DKK eller øre pr. kWh (eller pr. MWh) kan bruges; priser i euro kan ikke, fordi historikken ikke har en vekselkurs. Statistik markeret med ★ kommer fra Energi-dashboardet. Når du går videre, hentes historikken og tjekkes.",
         "data": {
           "buy_price_statistic": "Købspris (alt inkluderet)",
           "sell_price_statistic": "Salgspris (spot)",
@@ -141,6 +148,10 @@
           "sell_price_statistic": "kr/kWh. Som privat sælger får du ikke moms oveni.",
           "sell_deduction": "Det dit elselskab og nettet beholder pr. solgt kWh (handelsgebyr og indfødningstarif). Det trækkes fra salgsprisen. Typisk 0,02-0,10 kr/kWh; se din afregning."
         }
+      },
+      "check": {
+        "title": "Tjek af dine data",
+        "description": "Fundet **{hours}** timer med både energi og priser, fra {first} til {last} ({days} dage, {coverage} % af timerne i perioden).\n\n- Købspris i gennemsnit: **{buy} kr/kWh**\n- Salgspris efter fradrag i gennemsnit: **{sell} kr/kWh**\n- Købt fra nettet uden nyt batteri: **{imported} kWh/dag**\n- Solgt til nettet: **{exported} kWh/dag**\n\n{warnings}\n\nGå videre til batteriet med knappen nedenfor. Vil du vælge andre statistikker, så luk dialogen og start forfra."
       },
       "battery": {
         "title": "Batteri og inverter",
@@ -195,7 +206,10 @@
       "invalid_battery": "Tjek batteriet: effekten skal være over 0, og brugbar kapacitet og virkningsgrad mellem 50 og 100 %.",
       "system_price_too_low": "Anlægsprisen er lavere end dens eget batteri ved batteriprisen. Tjek anlægsprisen, batteristørrelsen i prisen eller batteriprisen.",
       "invalid_costs": "Tjek priserne, levetiden og antal cyklusser.",
-      "invalid_sizes": "Den største størrelse skal være mindst ét spring, og historikken skal være over 0."
+      "invalid_sizes": "Den største størrelse skal være mindst ét spring, og historikken skal være over 0.",
+      "unsupported_price_unit": "Prisen {statistic} er i {unit}. Brug en pris i kr, DKK eller øre pr. kWh eller MWh; både Nord Pool og Energi Data Service kan vise DKK.",
+      "no_history": "Home Assistant har ingen langtidsstatistik for: {statistics}. En sensor skal have en tilstandsklasse (measurement eller total) for at gemme den; nye sensorer gemmer den fra nu af.",
+      "too_little_history": "Kun {hours} timer har både energi og priser. Der skal mindst 720 timer (30 dage) til; tjek at energi- og prisstatistikken dækker samme periode."
     }
   },
   "selector": {
@@ -203,6 +217,18 @@
       "options": {
         "inverter": "Inverter: husets forbrug og solproduktion",
         "grid": "Elmåler: købt og solgt (fx ElOverblik)"
+      }
+    },
+    "check_warning": {
+      "options": {
+        "ok": "Ingen advarsler: tallene ser fornuftige ud.",
+        "low_buy_price": "Købsprisen er under 1 kr/kWh i gennemsnit. En dansk pris med nettarif, afgifter og moms er typisk 1,5 til 5 kr/kWh. Er det kun spotprisen, bliver besparelsen alt for lav.",
+        "high_buy_price": "Købsprisen er over 8 kr/kWh i gennemsnit. Tjek at den er i kr pr. kWh og ikke i øre uden enhed.",
+        "sell_above_buy": "Salgsprisen er lige så høj som købsprisen eller højere. Er de to priser byttet om?",
+        "no_import": "Der er ikke købt noget fra nettet i perioden. Tjek energistatistikken.",
+        "no_export": "Der er intet soloverskud eller salg i perioden. Uden det kan kun handel fra nettet betale sig. Tjek sol- eller salgsstatistikken.",
+        "short_history": "Der er under et års historik. Året sættes sammen af de måneder, der er, så en manglende sæson (vinter eller sommer) kan gøre resultatet for højt eller for lavt.",
+        "gaps": "Der mangler data i over en femtedel af timerne. Kun timer med både energi og priser bruges."
       }
     }
   },

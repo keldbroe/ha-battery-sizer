@@ -24,6 +24,7 @@ from .engine import (
     recommend_expansion,
 )
 from .settings import Settings, SettingsError
+from .units import UnsupportedPriceUnit
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -108,7 +109,13 @@ class BatterySizerCoordinator(DataUpdateCoordinator[CalculationResult]):
             settings.validate()
         except SettingsError as err:
             raise UpdateFailed(f"Invalid settings: {err.key}") from err
-        loaded = await async_load_hours(self.hass, settings, current_time())
+        try:
+            loaded = await async_load_hours(self.hass, settings, current_time())
+        except UnsupportedPriceUnit as err:
+            raise UpdateFailed(
+                f"The price {err.statistic} is in {err.unit or 'no unit'}; "
+                "only kr, DKK or øre per Wh, kWh or MWh can be used"
+            ) from err
         if loaded.missing:
             raise UpdateFailed(
                 "No history in Home Assistant for: " + ", ".join(loaded.missing)

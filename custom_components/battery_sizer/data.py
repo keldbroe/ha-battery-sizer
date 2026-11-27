@@ -8,12 +8,16 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from homeassistant.components.recorder import get_instance
-from homeassistant.components.recorder.statistics import statistics_during_period
+from homeassistant.components.recorder.statistics import (
+    get_metadata,
+    statistics_during_period,
+)
 from homeassistant.core import HomeAssistant
 
 from .engine import Hour
 from .engine.series import build_hours, energy_from_sums, split_gross, values_by_hour
 from .settings import Settings
+from .units import UnsupportedPriceUnit, price_factor
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,25 +53,51 @@ async def async_load_hours(
         settings.buy_price_statistic,
         settings.sell_price_statistic,
     }
-    result: Mapping[str, Sequence[Mapping[str, Any]]] = await get_instance(
-        hass
-    ).async_add_executor_job(
-        statistics_during_period,
+    prices = {settings.buy_price_statistic, settings.sell_price_statistic}
+    result, units = await get_instance(hass).async_add_executor_job(
+        _read, hass, start, statistic_ids, prices
+    )
+    factors: dict[str, float] = {}
+    for statistic in prices:
+        if statistic not in units:
+            continue  # no history; reported as missing
+        factor = price_factor(units[statistic])
+        if factor is None:
+            raise UnsupportedPriceUnit(statistic, units[statistic])
+        factors[statistic] = factor
+    return join(settings, result, factors)
+
+
+def _read(
+    hass: HomeAssistant, start: datetime, statistic_ids: set[str], prices: set[str]
+) -> tuple[Mapping[str, Sequence[Mapping[str, Any]]], dict[str, str | None]]:
+    """Read the rows, energy in kWh whatever the sensor's unit, and price units."""
+    result = statistics_during_period(
         hass,
         start,
         None,
         statistic_ids,
         "hour",
-        None,
+        {"energy": "kWh"},
         {"sum", "state", "mean"},
     )
-    return join(settings, result)
+    metadata = get_metadata(hass, statistic_ids=prices)
+    units = {
+        statistic: meta.get("unit_of_measurement")
+        for statistic, (_, meta) in metadata.items()
+    }
+    return result, units
 
 
 def join(
-    settings: Settings, result: Mapping[str, Sequence[Mapping[str, Any]]]
+    settings: Settings,
+    result: Mapping[str, Sequence[Mapping[str, Any]]],
+    price_factors: Mapping[str, float] | None = None,
 ) -> LoadedData:
-    """Turn recorder rows into engine hours (kept separate for testing)."""
+    """Turn recorder rows into engine hours (kept separate for testing).
+
+    ``price_factors`` turns each price statistic into kr/kWh.
+    """
 
     def rows(statistic: str | None) -> Sequence[Mapping[str, Any]]:
         return (result or {}).get(statistic or "", []) or []
@@ -78,7 +108,10 @@ def join(
         )
 
     def prices(statistic: str) -> dict[datetime, float]:
-        return values_by_hour((_start(row), _price(row)) for row in rows(statistic))
+        factor = (price_factors or {}).get(statistic, 1.0)
+        return values_by_hour(
+            (_start(row), _scaled(_price(row), factor)) for row in rows(statistic)
+        )
 
     if settings.source == "inverter":
         imports, exports = split_gross(
@@ -113,6 +146,10 @@ def _start(row: Mapping[str, Any]) -> datetime:
     if seconds > 10_000_000_000:
         seconds /= 1000
     return datetime.fromtimestamp(seconds, tz=UTC)
+
+
+def _scaled(value: float | None, factor: float) -> float | None:
+    return None if value is None else value * factor
 
 
 def _price(row: Mapping[str, Any]) -> float | None:

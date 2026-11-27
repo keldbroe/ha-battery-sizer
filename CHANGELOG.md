@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0
+
+### Fixed
+
+- **Units.** Energy statistics in Wh or MWh were read as kWh, and prices per MWh as prices per kWh: 1000 times off. Energy is now always read in kWh, and prices in kr, DKK or øre per Wh, kWh or MWh are turned into kr/kWh.
+  - A price in euro or another currency stops the calculation with a clear message instead of giving wrong numbers. Such prices are no longer offered in the setup.
+  - The price list no longer offers sensors such as g/kWh or km/kWh.
+
+### Added
+
+- **Suggestions from the Energy dashboard.** The setup fills in the grid meter, solar and price sensors from Home Assistant's Energy dashboard and lists them first, marked ★. A home with a battery gets the inverter as source.
+- **A check of your data** after the prices: hours found, the period, average buy and sell price, and energy bought and sold per day. Warnings for a buy price without taxes, swapped prices, no solar, less than a year of history, or many gaps. Missing statistics, too little history, or a price in euro keep you on the prices page with an explanation.
+- **README guide:** which statistics to pick for ElOverblik, a meter reader, or an inverter; how to make a kWh counter from a power sensor; and which prices to use.
+
 ## 0.3.0
 
 ### Added
