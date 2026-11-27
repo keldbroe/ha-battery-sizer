@@ -232,3 +232,70 @@ async def test_switching_source_drops_the_old_statistics(hass) -> None:
     assert CONF_IMPORT not in entry.options
     assert CONF_EXPORT not in entry.options
     assert entry.options[CONF_SOURCE] == "inverter"
+
+
+async def test_statistics_are_offered_in_plain_drop_downs(hass) -> None:
+    """The fields are drop-downs filled from the recorder, never the statistic picker.
+
+    The statistic picker left the whole setup page blank in the frontend.
+    Energy fields list cumulative kWh statistics, external ones included;
+    price fields list statistics per kWh. Other statistics are left out.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from homeassistant.components.recorder.statistics import (
+        async_add_external_statistics,
+        async_import_statistics,
+    )
+    from pytest_homeassistant_custom_component.components.recorder.common import (
+        async_wait_recording_done,
+    )
+
+    from tests.test_data import _metadata
+
+    start = datetime(2026, 3, 1, tzinfo=UTC)
+    rows = [
+        {"start": start + timedelta(hours=i), "sum": float(i), "state": float(i)}
+        for i in range(3)
+    ]
+    async_import_statistics(
+        hass, _metadata("sensor.load_total", "kWh", has_sum=True), rows
+    )
+    external = _metadata("eloverblik_dk:energy_571313174001057915", "kWh", has_sum=True)
+    external["source"] = "eloverblik_dk"
+    async_add_external_statistics(hass, external, rows)
+    async_import_statistics(
+        hass, _metadata("sensor.buy", "DKK/kWh", has_sum=True), rows
+    )
+    async_import_statistics(
+        hass, _metadata("sensor.outdoor_temperature", "°C", has_sum=True), rows
+    )
+    await async_wait_recording_done(hass)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": "user"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_SOURCE: "grid"}
+    )
+
+    def options(step, key):
+        field = step["data_schema"].schema[key]
+        assert field.serialize()["selector"].keys() == {"select"}
+        return {option["value"] for option in field.config["options"]}
+
+    energy = options(result, CONF_IMPORT)
+    assert "sensor.load_total" in energy
+    assert "eloverblik_dk:energy_571313174001057915" in energy
+    assert "sensor.buy" not in energy
+    assert "sensor.outdoor_temperature" not in energy
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_IMPORT: "eloverblik_dk:energy_571313174001057915"}
+    )
+    prices = options(result, CONF_BUY_PRICE)
+    assert prices == {"sensor.buy"}
+    # A statistic id that is not in the list can still be typed in.
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {**PRICES, CONF_SELL_PRICE: "sensor.typed_in"}
+    )
+    assert result["step_id"] == "battery"
