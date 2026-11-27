@@ -86,7 +86,7 @@ const TEXT = {
     existing: "Current battery",
     strategies: {
       self_consumption: "Own consumption",
-      solar_trading: "Solar and selling",
+      solar_trading: "Solar and sale",
       grid_trading: "Trading",
     },
     verdicts: {

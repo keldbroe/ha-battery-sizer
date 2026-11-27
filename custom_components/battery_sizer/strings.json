@@ -265,7 +265,7 @@
         }
       },
       "solar_trading_verdict": {
-        "name": "Solar and selling: verdict",
+        "name": "Solar and sale: verdict",
         "state": {
           "pays_off": "Pays off",
           "does_not_pay_off": "Does not pay off",
