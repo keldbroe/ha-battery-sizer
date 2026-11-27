@@ -163,13 +163,38 @@ async def test_an_existing_battery_turns_it_into_an_expansion(hass, loads) -> No
     )
 
 
-async def test_nothing_pays_off_gives_zero_and_unknown_numbers(hass, loads) -> None:
+async def test_wear_above_any_gain_is_no_gain(hass, loads) -> None:
     entry = await _setup(hass, {**OPTIONS, CONF_BATTERY_PRICE: 50_000})
     size = _state(hass, "self_consumption_recommended_size", entry)
     assert float(size.state) == 0
-    assert size.attributes["pays_off"] is False
-    assert size.attributes["sizes"]
+    assert _state(hass, "self_consumption_verdict", entry).state == "no_gain"
     assert _state(hass, "self_consumption_payback", entry).state == "unknown"
+
+
+async def test_nothing_pays_off_shows_the_closest_option(hass, loads) -> None:
+    entry = await _setup(
+        hass, {**OPTIONS, CONF_BATTERY_PRICE: 20_000, CONF_CYCLE_LIFE: 50_000}
+    )
+    size = _state(hass, "self_consumption_recommended_size", entry)
+    assert float(size.state) == 0
+    assert size.attributes["pays_off"] is False
+    assert size.attributes["verdict"] == "does_not_pay_off"
+    assert size.attributes["candidate_kwh"] > 0
+    assert size.attributes["sizes"]
+    verdict = _state(hass, "self_consumption_verdict", entry)
+    assert verdict.state == "does_not_pay_off"
+    assert float(_state(hass, "self_consumption_annual_savings", entry).state) > 0
+    assert float(_state(hass, "self_consumption_net_present_value", entry).state) < 0
+    payback = _state(hass, "self_consumption_payback", entry)
+    assert float(payback.state) > 1
+    assert payback.attributes["within_lifetime"] is False
+
+
+async def test_verdict_when_it_pays_off(hass, loads) -> None:
+    entry = await _setup(hass)
+    assert _state(hass, "self_consumption_verdict", entry).state == "pays_off"
+    payback = _state(hass, "self_consumption_payback", entry)
+    assert payback.attributes["within_lifetime"] is True
 
 
 async def test_button_and_action_calculate_again(hass, loads) -> None:
