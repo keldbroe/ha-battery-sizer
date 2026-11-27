@@ -1,14 +1,26 @@
 {
   "domain": "battery_sizer",
   "name": "Batteri-beregner (DK)",
-  "codeowners": ["@keldbroe"],
+  "after_dependencies": [
+    "frontend",
+    "http",
+    "panel_custom",
+    "websocket_api"
+  ],
+  "codeowners": [
+    "@keldbroe"
+  ],
   "config_flow": true,
-  "dependencies": ["recorder"],
+  "dependencies": [
+    "recorder"
+  ],
   "documentation": "https://github.com/keldbroe/ha-battery-sizer",
   "integration_type": "service",
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/keldbroe/ha-battery-sizer/issues",
-  "loggers": ["custom_components.battery_sizer"],
+  "loggers": [
+    "custom_components.battery_sizer"
+  ],
   "requirements": [],
-  "version": "0.1.2"
+  "version": "0.2.0"
 }

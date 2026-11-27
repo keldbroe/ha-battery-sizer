@@ -18,6 +18,7 @@ from .data import LoadedData, async_load_hours
 from .engine import (
     ExpansionRecommendation,
     Recommendation,
+    SimulationResult,
     Strategy,
     recommend,
     recommend_expansion,
@@ -58,6 +59,8 @@ class Outcome:
     investment: float | None
     cycles_per_year: float | None
     table: list[dict[str, Any]] = field(default_factory=list)
+    # A typical year, month by month, for the option shown (for the panel).
+    monthly: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +75,7 @@ class CalculationResult:
     existing_kwh: float
     existing_annual_savings: dict[Strategy, float]
     outcomes: dict[Strategy, Outcome]
+    existing_monthly: dict[Strategy, list[dict[str, Any]]] = field(default_factory=dict)
 
 
 def current_time() -> datetime:
@@ -129,6 +133,7 @@ def _calculate(
     sizes = settings.sizes()
     outcomes: dict[Strategy, Outcome] = {}
     existing: dict[Strategy, float] = {}
+    existing_monthly: dict[Strategy, list[dict[str, Any]]] = {}
     months = 0
     for strategy in Strategy:
         if settings.is_expansion:
@@ -142,6 +147,7 @@ def _calculate(
                 added=sizes,
             )
             existing[strategy] = expansion.existing.annual_savings
+            existing_monthly[strategy] = monthly(expansion.existing)
             months = expansion.existing.months_covered
             outcomes[strategy] = _expansion_outcome(strategy, expansion)
         else:
@@ -160,6 +166,7 @@ def _calculate(
         existing_kwh=settings.existing_kwh,
         existing_annual_savings=existing,
         outcomes=outcomes,
+        existing_monthly=existing_monthly,
     )
 
 
@@ -176,33 +183,80 @@ def _row(kwh: float, savings: float, economics: Any) -> dict[str, Any]:
     }
 
 
+def monthly(
+    simulation: SimulationResult, baseline: SimulationResult | None = None
+) -> list[dict[str, Any]]:
+    """Savings and energy per calendar month of a typical year.
+
+    With ``baseline`` (the battery you have), savings are the extra savings
+    of the expansion; the energy is what the whole battery moves.
+    """
+
+    def months(sim: SimulationResult | None, pick) -> list[float | None]:
+        return sim.typical_months(pick) if sim is not None else [0.0] * 12
+
+    savings = months(simulation, lambda t: t.savings)
+    before = months(baseline, lambda t: t.savings)
+    flows = {
+        "delivered_kwh": months(simulation, lambda t: t.delivered_to_home_kwh),
+        "sold_kwh": months(simulation, lambda t: t.sold_from_battery_kwh),
+        "charged_solar_kwh": months(simulation, lambda t: t.charged_from_solar_kwh),
+        "charged_grid_kwh": months(simulation, lambda t: t.charged_from_grid_kwh),
+        "cycles": months(simulation, lambda t: t.full_cycles),
+    }
+    rows: list[dict[str, Any]] = []
+    for index in range(12):
+        value = savings[index]
+        row: dict[str, Any] = {
+            "month": index + 1,
+            "savings": None
+            if value is None
+            else round(value - (before[index] or 0.0), 1),
+        }
+        for key, values in flows.items():
+            row[key] = None if values[index] is None else round(values[index], 1)
+        rows.append(row)
+    return rows
+
+
 def _new_outcome(strategy: Strategy, rec: Recommendation) -> Outcome:
     candidates = [
-        (size.capacity_kwh, size.economics.annual_savings, size.economics)
+        (
+            size.capacity_kwh,
+            size.economics.annual_savings,
+            size.economics,
+            size.simulation,
+        )
         for size in rec.sizes
         if size.capacity_kwh > 0
     ]
     best = rec.best.capacity_kwh if rec.best is not None else None
-    return _outcome(strategy, False, candidates, best)
+    return _outcome(strategy, False, candidates, best, None)
 
 
 def _expansion_outcome(strategy: Strategy, rec: ExpansionRecommendation) -> Outcome:
     candidates = [
-        (option.added_kwh, option.extra_annual_savings, option.economics)
+        (
+            option.added_kwh,
+            option.extra_annual_savings,
+            option.economics,
+            option.simulation,
+        )
         for option in rec.options
     ]
     best = rec.best.added_kwh if rec.best is not None else None
-    return _outcome(strategy, True, candidates, best)
+    return _outcome(strategy, True, candidates, best, rec.existing)
 
 
 def _outcome(
     strategy: Strategy,
     expansion: bool,
-    candidates: list[tuple[float, float, Any]],
+    candidates: list[tuple[float, float, Any, SimulationResult]],
     best_kwh: float | None,
+    baseline: SimulationResult | None,
 ) -> Outcome:
     """Describe the recommendation, or the closest option when none pays off."""
-    table = [_row(kwh, savings, economics) for kwh, savings, economics in candidates]
+    table = [_row(kwh, savings, economics) for kwh, savings, economics, _ in candidates]
     if not candidates:
         return Outcome(
             strategy,
@@ -219,10 +273,14 @@ def _outcome(
             table,
         )
     if best_kwh is not None:
-        kwh, savings, economics = next(c for c in candidates if c[0] == best_kwh)
+        kwh, savings, economics, simulation = next(
+            c for c in candidates if c[0] == best_kwh
+        )
         verdict = VERDICT_PAYS_OFF
     else:
-        kwh, savings, economics = max(candidates, key=lambda c: c[2].net_present_value)
+        kwh, savings, economics, simulation = max(
+            candidates, key=lambda c: c[2].net_present_value
+        )
         verdict = VERDICT_DOES_NOT_PAY_OFF if savings > 0.5 else VERDICT_NO_GAIN
     payback = economics.investment / savings if savings > 0.5 else None
     return Outcome(
@@ -238,4 +296,5 @@ def _outcome(
         investment=round(economics.investment),
         cycles_per_year=round(economics.annual_cycles),
         table=table,
+        monthly=monthly(simulation, baseline),
     )

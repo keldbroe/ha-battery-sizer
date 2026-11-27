@@ -44,12 +44,25 @@ For hver strategi (eget forbrug, sol og salg, handel):
 
 | Sensor | Viser |
 | --- | --- |
-| Anbefalet batteri / anbefalet udvidelse | kWh. 0 når ingen størrelse betaler sig. Attributten `sizes` viser alle størrelser, der er prøvet, med besparelse, investering, tilbagebetalingstid, nutidsværdi og cyklusser, så du kan lave dine egne grafer. |
-| Besparelse pr. år | kr pr. år for den anbefalede størrelse, eller den ekstra besparelse ved udvidelsen |
-| Tilbagebetalingstid | År |
+| Konklusion | *Betaler sig*, *Betaler sig ikke* eller *Ingen gevinst* |
+| Anbefalet batteri / anbefalet udvidelse | kWh. 0 når ingen størrelse betaler sig. Attributten `sizes` viser alle størrelser, der er prøvet, med besparelse, investering, tilbagebetalingstid, nutidsværdi og cyklusser. |
+| Besparelse pr. år | kr pr. år for den anbefalede størrelse, eller den ekstra besparelse ved udvidelsen. Betaler intet sig, vises tallet for det bedste bud (attributten `candidate_kwh`). |
+| Tilbagebetalingstid | År. Vises også, når den er længere end levetiden (attributten `within_lifetime`). |
 | Nutidsværdi | kr over levetiden |
 
 **Seneste beregning** (diagnostik) viser hvornår beregningen kørte, hvor mange timer den brugte, og fejlen hvis en kørsel fejlede.
+
+### Panel med grafer
+
+Integrationen tilføjer **Batteri-beregner** i sidepanelet. Det viser:
+
+- et kort pr. strategi med konklusion, størrelse, besparelse, tilbagebetalingstid og nutidsværdi
+- nutidsværdi, besparelse og tilbagebetalingstid efter batteristørrelse (eller udvidelse), med levetiden som stiplet linje
+- besparelsen pr. måned i et typisk år
+- energien gennem batteriet pr. måned: leveret til hjemmet, solgt og ladet fra nettet
+- en tabel med alle størrelser
+
+Knappen **Beregn igen** kører beregningen med det samme.
 
 ### Hvad den beregner
 
@@ -149,12 +162,25 @@ For each strategy (own consumption, solar and sale, trading):
 
 | Sensor | Shows |
 | --- | --- |
-| Recommended battery / recommended expansion | kWh. 0 when no size pays off. The `sizes` attribute lists every size tried with savings, investment, payback, net present value and cycles, for your own charts. |
-| Savings per year | kr per year for the recommended size, or the extra savings from the expansion |
-| Payback time | Years |
+| Verdict | *Pays off*, *Does not pay off* or *No gain* |
+| Recommended battery / recommended expansion | kWh. 0 when no size pays off. The `sizes` attribute lists every size tried with savings, investment, payback, net present value and cycles. |
+| Savings per year | kr per year for the recommended size, or the extra savings from the expansion. When nothing pays off, the closest option's number (the `candidate_kwh` attribute). |
+| Payback time | Years. Also shown when longer than the lifetime (the `within_lifetime` attribute). |
 | Net present value | kr over the lifetime |
 
 **Last calculation** (diagnostic) shows when the calculation ran, how many hours it used, and the error if a run failed.
+
+### Panel with charts
+
+The integration adds **Batteri-beregner** to the sidebar. It shows:
+
+- a card per strategy with verdict, size, savings, payback and net present value
+- net present value, savings and payback by battery size (or expansion), with the lifetime as a dashed line
+- the savings per month of a typical year
+- the energy through the battery per month: delivered to the home, sold, and charged from the grid
+- a table of every size
+
+The **Calculate again** button runs the calculation right away.
 
 ### What it calculates
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.0
+
+### Added
+
+- **Panel with charts** in the sidebar (*Batteri-beregner*):
+  - a card per strategy with the verdict and the key numbers
+  - net present value, savings and payback by size, with the lifetime marked
+  - savings per month of a typical year
+  - energy through the battery per month (to the home, sold, charged from the grid)
+  - a table of every size, and a **Calculate again** button
+- Danish and English, follows the Home Assistant theme (light and dark), works on a phone. No external libraries, so it works offline.
+- Websocket command `battery_sizer/results` with the full result, including the month-by-month figures.
+
 ## 0.1.2
 
 ### Changed
