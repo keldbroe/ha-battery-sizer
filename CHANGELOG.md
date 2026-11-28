@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0
+
+### Added
+
+- **An ⓘ by every field in the panel's assumptions.** It opens a full explanation of the field: what it means, typical values, and when it is used. The texts are in Danish and English and follow your language.
+- **Fields that are not used are dimmed**, with a note saying why. With a battery (an expansion), the system price and its battery size are ignored; without one (a new system), the expansion cost is. The dimming follows the existing-battery field as you type.
+
+### Changed
+
+- The short help text that appeared under a field on focus is replaced by the ⓘ.
+
 ## 0.4.0
 
 ### Fixed

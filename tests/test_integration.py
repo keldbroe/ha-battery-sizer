@@ -332,6 +332,10 @@ async def test_settings_command_lists_the_fields_in_danish(
     assert fields["power_kw"]["value"] == 5
     assert fields["power_kw"]["unit"] == "kW"
     assert fields["battery_price_per_kwh"]["max"] == 50_000
+    # Every field has a longer explanation for the panel's "i".
+    assert all(field["help"] for field in fields.values())
+    assert "Selv et stort batteri" in fields["power_kw"]["help"]
+    assert "kun ved et nyt anlæg" in fields["system_price"]["help"]
     assert "system_price_too_low" in result["errors"]
 
 

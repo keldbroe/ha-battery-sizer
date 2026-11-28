@@ -230,6 +230,26 @@
         "short_history": "Der er under et års historik. Året sættes sammen af de måneder, der er, så en manglende sæson (vinter eller sommer) kan gøre resultatet for højt eller for lavt.",
         "gaps": "Der mangler data i over en femtedel af timerne. Kun timer med både energi og priser bruges."
       }
+    },
+    "field_help": {
+      "options": {
+        "existing_kwh": "Hvor stort batteri du har i dag.\n\n**0** = intet batteri. Så regnes der på et **nyt anlæg**: hvor stort et batteri skal du købe?\n\n**Over 0** = der regnes på en **udvidelse**: hvor mange kWh betaler det sig at købe oveni? Kun den ekstra besparelse tæller.\n\nHar du et batteri, skal datakilden være **Inverter** (husets forbrug og sol), fordi elmåleren allerede viser det, batteriet gør.",
+        "power_kw": "Hvor hurtigt batteriet kan lade op og af, begrænset af inverteren (og batteriet). Selv et stort batteri kan aldrig levere mere end dette pr. time. Typisk 5, 10 eller 12 kW.",
+        "usable_pct": "Hvor meget af batteriets nominelle kapacitet der faktisk må bruges. Typisk 90–95 % for LFP-batterier. Holder inverteren batteriet mellem fx 10 og 90 %, er det 80 %.",
+        "efficiency_pct": "Hvor meget af 1 kWh lagt ind i batteriet der kommer ud igen, med inverterens tab. Typisk 85–92 %; 90 % er et godt bud.",
+        "grid_limit_kw": "Det mest, du må trække fra eller sende til nettet ad gangen. **0 = ingen grænse.** 3×25 A er ca. 17 kW, 3×35 A ca. 24 kW. Betyder mest ved handel, hvor batteriet lader hurtigt fra nettet, mens huset også bruger strøm.",
+        "sell_deduction": "Det dit elselskab og nettet beholder pr. kWh, du sælger (handelsgebyr og indfødningstarif). Det trækkes fra spotprisen. Se din afregning; typisk 0,02–0,10 kr/kWh.",
+        "battery_price_per_kwh": "Prisen for én kWh batteri mere: ekstra moduler eller celler. Ved en udvidelse er det den, der bruges.\n\nDen bruges også til sliddet: batteriprisen delt med antal cyklusser er, hvad hver kWh gennem batteriet koster i slid.\n\nEksempel: 12.000 kr for 16 kWh = 750 kr/kWh.",
+        "system_price": "Bruges **kun ved et nyt anlæg** (nuværende batteri = 0).\n\nSkriv prisen fra et tilbud på et helt anlæg: inverter, batteri og montering. Sammen med batteristørrelsen i tilbuddet regner beregneren ud, hvad anlægget koster ud over batteriet, og lægger det på som fast pris for alle størrelser.\n\n**0** = kun battericellerne koster noget. Så ser et nyt anlæg alt for godt ud.",
+        "system_battery_kwh": "Hvor mange kWh batteri tilbuddet i anlægsprisen indeholder. Batteriet trækkes fra (kWh × batteripris); resten er den faste pris for inverter og montering.\n\nBruges **kun ved et nyt anlæg**.",
+        "expansion_cost": "Engangsbeløb for at sætte ekstra moduler på det batteri, du har: montering, kabler, evt. et ekstra rack.\n\nBruges **kun ved en udvidelse**. Står den på 0, ser små udvidelser for gode ud.",
+        "lifetime_years": "Hvor mange år batteriet holder. Batteriet er slidt op efter årene eller cyklusserne, hvad der kommer først. Besparelsen tælles med i så mange år.",
+        "cycle_life": "Hvor mange fulde op- og afladninger batteriet er godkendt til, typisk 6.000 for LFP.\n\nBatteriprisen delt med antal cyklusser er sliddet pr. kWh. Eksempel: 750 / 6.000 = 0,125 kr. Batteriet bruges kun, når gevinsten er større end sliddet.",
+        "discount_pct": "Hvad penge er værd for dig, fx renten i banken eller på et lån. Med **0 %** er 1.000 kr om 10 år lige så meget værd som 1.000 kr i dag. 2–4 % er realistisk.\n\nPåvirker kun nutidsværdien.",
+        "max_kwh": "Den største størrelse, der regnes på. Ved en udvidelse er det ekstra kWh oveni det batteri, du har.\n\nLander den bedste størrelse på grænsen, så hæv den: måske topper kurven først længere ude.",
+        "step_kwh": "Afstanden mellem de størrelser, der prøves. 5 giver 5, 10, 15 … kWh. Mindre spring giver et mere præcist svar, men beregningen tager længere tid.",
+        "history_years": "Hvor langt tilbage data hentes. Mere historik giver et mere sikkert gennemsnit, og et helt år giver både sommer og vinter. Findes der mindre, bruges det, der er."
+      }
     }
   },
   "entity": {

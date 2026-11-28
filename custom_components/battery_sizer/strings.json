@@ -230,6 +230,26 @@
         "short_history": "There is less than a year of history. The year is put together from the months there are, so a season that is missing (winter or summer) can make the result too high or too low.",
         "gaps": "Data is missing for more than a fifth of the hours. Only hours with both energy and prices are used."
       }
+    },
+    "field_help": {
+      "options": {
+        "existing_kwh": "The battery you have today.\n\n**0** = no battery. The calculation is about a **new system**: how big a battery should you buy?\n\n**Above 0** = the calculation is about an **expansion**: how many kWh does it pay to add? Only the extra savings count.\n\nWith a battery, the data source should be **Inverter** (the home's load and solar), because the grid meter already shows what the battery does.",
+        "power_kw": "How fast the battery can charge and discharge, limited by the inverter (and the battery). Even a large battery never delivers more than this per hour. Usually 5, 10 or 12 kW.",
+        "usable_pct": "How much of the battery's nominal capacity may actually be used. Usually 90–95 % for LFP batteries. If the inverter keeps the battery between, say, 10 and 90 %, it is 80 %.",
+        "efficiency_pct": "How much of 1 kWh put into the battery comes back out, inverter losses included. Usually 85–92 %; 90 % is a good guess.",
+        "grid_limit_kw": "The most you may draw from or send to the grid at a time. **0 = no limit.** 3×25 A is about 17 kW, 3×35 A about 24 kW. It matters most for trading, when the battery charges fast from the grid while the home also uses power.",
+        "sell_deduction": "What your supplier and the grid keep per kWh you sell (trading fee and feed-in tariff). It is taken off the spot price. See your statement; usually 0.02–0.10 kr/kWh.",
+        "battery_price_per_kwh": "The price of one more kWh of battery: extra modules or cells. For an expansion, this is the price used.\n\nIt also sets the wear: the battery price divided by the cycle life is what each kWh through the battery costs in wear.\n\nExample: 12,000 kr for 16 kWh = 750 kr/kWh.",
+        "system_price": "Used **only for a new system** (existing battery = 0).\n\nEnter the price from a quote for a whole system: inverter, battery and installation. With the battery size in that quote, the calculation works out what the system costs beyond the battery and adds it as a fixed price to every size.\n\n**0** = only the battery cells cost anything. A new system then looks far too good.",
+        "system_battery_kwh": "How many kWh of battery the quoted system price includes. The battery is taken off (kWh × battery price); the rest is the fixed price for the inverter and installation.\n\nUsed **only for a new system**.",
+        "expansion_cost": "A one-off amount for adding modules to the battery you have: installation, cables, maybe an extra rack.\n\nUsed **only for an expansion**. Left at 0, small expansions look too good.",
+        "lifetime_years": "How many years the battery lasts. The battery is worn out after the years or the cycles, whichever comes first. The savings count for that many years.",
+        "cycle_life": "How many full charge and discharge cycles the battery is rated for, usually 6,000 for LFP.\n\nThe battery price divided by the cycles is the wear per kWh. Example: 750 / 6,000 = 0.125 kr. The battery is only used when the gain is larger than the wear.",
+        "discount_pct": "What money is worth to you, for example the interest in the bank or on a loan. At **0 %**, 1,000 kr in 10 years is worth as much as 1,000 kr today. 2–4 % is realistic.\n\nIt only affects the net present value.",
+        "max_kwh": "The largest size calculated. For an expansion, it is the kWh added to the battery you have.\n\nIf the best size lands on this limit, raise it: the curve may peak further out.",
+        "step_kwh": "The distance between the sizes tried. 5 gives 5, 10, 15 … kWh. Smaller steps give a more precise answer but take longer to calculate.",
+        "history_years": "How far back the data is read. More history gives a safer average, and a full year has both summer and winter. If there is less, what there is is used."
+      }
     }
   },
   "entity": {
