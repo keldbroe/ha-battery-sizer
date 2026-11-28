@@ -71,6 +71,9 @@ const TEXT = {
     outOfRange: "Skal være mellem {min} og {max}",
     notNumber: "Skriv et tal",
     changed: "ændret",
+    moreInfo: "Forklaring",
+    unusedExpansion: "Bruges ikke, når du har et batteri (udvidelse).",
+    unusedNew: "Bruges kun, når du har et batteri (udvidelse).",
   },
   en: {
     title: "Battery sizer",
@@ -129,6 +132,9 @@ const TEXT = {
     outOfRange: "Must be between {min} and {max}",
     notNumber: "Enter a number",
     changed: "changed",
+    moreInfo: "Explanation",
+    unusedExpansion: "Not used when you have a battery (expansion).",
+    unusedNew: "Only used when you have a battery (expansion).",
   },
 };
 
@@ -180,6 +186,7 @@ class BatterySizerPanel extends HTMLElement {
     this._saving = false;
     this._saveError = null;
     this._pendingSince = undefined;
+    this._openHelp = new Set();
   }
 
   set hass(hass) {
@@ -352,6 +359,38 @@ class BatterySizerPanel extends HTMLElement {
     return null;
   }
 
+  // Fields the calculation ignores in the current mode: the system price is
+  // for a new system, the expansion cost for adding to a battery.
+  _unusedFields(entry) {
+    const field = this._settingsFor(entry)?.groups.flatMap((g) => g.fields).find((f) => f.key === "existing_kwh");
+    if (!field) return { keys: [], note: "" };
+    const text = this._draft.existing_kwh;
+    let existing = field.value;
+    if (text !== undefined && !this._fieldError(field, text)) existing = this._parseInput(text);
+    return existing > 0
+      ? { keys: ["system_price", "system_battery_kwh"], note: this._t.unusedExpansion }
+      : { keys: ["expansion_cost"], note: this._t.unusedNew };
+  }
+
+  _applyUnused(entry) {
+    const { keys, note } = this._unusedFields(entry);
+    this.shadowRoot.querySelectorAll(".field[data-key]").forEach((el) => {
+      const unused = keys.includes(el.dataset.key);
+      el.classList.toggle("unused", unused);
+      el.querySelector(".field-unused").textContent = unused ? note : "";
+    });
+  }
+
+  _helpHtml(text) {
+    // The help texts come from the integration's translations: escape them,
+    // then allow **bold** and paragraphs.
+    return escapeHtml(text)
+      .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+      .split(/\n\n+/)
+      .map((part) => `<p>${part.replace(/\n/g, "<br>")}</p>`)
+      .join("");
+  }
+
   _settingsFor(entry) {
     return this._settings?.entries?.[entry.entry_id];
   }
@@ -508,19 +547,25 @@ class BatterySizerPanel extends HTMLElement {
         wrap.classList.toggle("invalid", !!error);
         wrap.classList.toggle("changed", !error && value !== field.value);
         wrap.querySelector(".field-error").textContent = error || "";
+        if (key === "existing_kwh") this._applyUnused(entry);
         this._updateSaveState(entry);
-      });
-      // The help text stays with the last field chosen: hiding it on blur
-      // would move the buttons below while they are being clicked.
-      input.addEventListener("focus", () => {
-        this._activeField = input.dataset.field;
-        root.querySelectorAll(".field.active").forEach((el) => el.classList.remove("active"));
-        input.closest(".field").classList.add("active");
       });
       input.addEventListener("keydown", (ev) => {
         if (ev.key === "Enter") this._save(entry);
       });
     });
+    root.querySelectorAll("button[data-help]").forEach((button) =>
+      button.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        const key = button.dataset.help;
+        const open = !this._openHelp.has(key);
+        if (open) this._openHelp.add(key);
+        else this._openHelp.delete(key);
+        const wrap = button.closest(".field");
+        wrap.classList.toggle("help-open", open);
+        button.setAttribute("aria-expanded", String(open));
+      })
+    );
     root.getElementById("save")?.addEventListener("click", () => this._save(entry));
     root.getElementById("undo")?.addEventListener("click", () => {
       this._draft = {};
@@ -635,6 +680,7 @@ class BatterySizerPanel extends HTMLElement {
       .map((f) => `${this._formatInput(f.value)} ${this._unit(f.unit)}`)
       .join(" · ");
     const pending = this._pendingSince !== undefined;
+    const unused = this._unusedFields(entry);
     const groups = settings.groups
       .map(
         (group) => `<fieldset>
@@ -645,17 +691,33 @@ class BatterySizerPanel extends HTMLElement {
               const shown = text !== undefined ? text : this._formatInput(field.value);
               const error = text !== undefined ? this._fieldError(field, text) : null;
               const changed = text !== undefined && !error && this._parseInput(text) !== field.value;
-              const active = this._activeField === field.key ? "active" : "";
-              return `<label class="field ${active} ${error ? "invalid" : ""} ${changed ? "changed" : ""}">
-                <span class="field-label">${escapeHtml(field.label)}</span>
+              const isUnused = unused.keys.includes(field.key);
+              const helpOpen = this._openHelp.has(field.key);
+              const help = field.help || field.description || "";
+              const classes = [
+                "field",
+                error ? "invalid" : "",
+                changed ? "changed" : "",
+                isUnused ? "unused" : "",
+                helpOpen ? "help-open" : "",
+              ].join(" ");
+              return `<div class="${classes}" data-key="${field.key}">
+                <div class="field-head">
+                  <label class="field-label" for="f-${field.key}">${escapeHtml(field.label)}</label>
+                  ${help
+                    ? `<button type="button" class="info" data-help="${field.key}" aria-expanded="${helpOpen}"
+                        aria-controls="h-${field.key}" title="${t.moreInfo}" aria-label="${t.moreInfo}: ${escapeHtml(field.label)}">i</button>`
+                    : ""}
+                </div>
                 <span class="input-wrap">
-                  <input data-field="${field.key}" type="text" inputmode="decimal" autocomplete="off"
+                  <input id="f-${field.key}" data-field="${field.key}" type="text" inputmode="decimal" autocomplete="off"
                     value="${escapeHtml(shown)}" ${canEdit && !pending ? "" : "disabled"}>
                   ${field.unit ? `<span class="unit">${escapeHtml(this._unit(field.unit))}</span>` : ""}
                 </span>
                 <span class="field-error">${error ? escapeHtml(error) : ""}</span>
-                ${field.description ? `<span class="field-help">${escapeHtml(field.description)}</span>` : ""}
-              </label>`;
+                <span class="field-unused">${isUnused ? escapeHtml(unused.note) : ""}</span>
+                ${help ? `<div class="field-help" id="h-${field.key}">${this._helpHtml(help)}</div>` : ""}
+              </div>`;
             })
             .join("")}</div>
         </fieldset>`
@@ -1142,8 +1204,43 @@ const STYLE = `
   .unit { color: var(--secondary-text-color, #727272); font-size: 14px; margin-left: 6px; white-space: nowrap; }
   .field-error { color: var(--error-color, #db4437); font-size: 12px; min-height: 0; }
   .field-error:empty { display: none; }
-  .field-help { color: var(--secondary-text-color, #727272); font-size: 12px; line-height: 1.35; display: none; }
-  .field.active .field-help { display: block; }
+  .field-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .info {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px solid var(--secondary-text-color, #727272);
+    background: transparent;
+    color: var(--secondary-text-color, #727272);
+    font: italic 600 12px/1 Georgia, "Times New Roman", serif;
+    cursor: pointer;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .info:hover, .field.help-open .info {
+    border-color: var(--primary-color, #03a9f4);
+    color: var(--text-primary-color, #fff);
+    background: var(--primary-color, #03a9f4);
+  }
+  .field-help {
+    display: none;
+    color: var(--primary-text-color, #212121);
+    font-size: 13px;
+    line-height: 1.45;
+    background: rgba(127, 127, 127, 0.1);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+  .field-help p { margin: 0 0 6px; }
+  .field-help p:last-child { margin-bottom: 0; }
+  .field.help-open .field-help { display: block; }
+  .field-unused { color: var(--secondary-text-color, #727272); font-size: 12px; font-style: italic; }
+  .field-unused:empty { display: none; }
+  .field.unused .input-wrap { opacity: 0.5; }
+  .field.unused .field-label { opacity: 0.7; }
   .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
   .form-actions button {
     border-radius: 18px;

@@ -213,7 +213,9 @@ async def ws_settings(
     """Return the fields the panel can change, with labels in the user's language."""
     language = msg.get("language") or hass.config.language
     texts = await async_get_translations(hass, language, "config", [DOMAIN])
+    helps = await async_get_translations(hass, language, "selector", [DOMAIN])
     prefix = f"component.{DOMAIN}.config"
+    help_prefix = f"component.{DOMAIN}.selector.field_help.options"
     entries: dict[str, Any] = {}
     for entry in hass.config_entries.async_entries(DOMAIN):
         values = {**DEFAULTS, **entry.data, **entry.options}
@@ -230,6 +232,7 @@ async def ws_settings(
                             "description": texts.get(
                                 f"{prefix}.step.{step}.data_description.{key}", ""
                             ),
+                            "help": helps.get(f"{help_prefix}.{key}", ""),
                             "min": field.config.get("min"),
                             "max": field.config.get("max"),
                             "step": field.config.get("step"),
