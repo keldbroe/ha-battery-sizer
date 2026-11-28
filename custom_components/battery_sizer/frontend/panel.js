@@ -705,7 +705,7 @@ class BatterySizerPanel extends HTMLElement {
                 <div class="field-head">
                   <label class="field-label" for="f-${field.key}">${escapeHtml(field.label)}</label>
                   ${help
-                    ? `<button type="button" class="info" data-help="${field.key}" aria-expanded="${helpOpen}"
+                    ? `<button type="button" class="info-button" data-help="${field.key}" aria-expanded="${helpOpen}"
                         aria-controls="h-${field.key}" title="${t.moreInfo}" aria-label="${t.moreInfo}: ${escapeHtml(field.label)}">i</button>`
                     : ""}
                 </div>
@@ -1205,7 +1205,7 @@ const STYLE = `
   .field-error { color: var(--error-color, #db4437); font-size: 12px; min-height: 0; }
   .field-error:empty { display: none; }
   .field-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .info {
+  .info-button {
     flex: none;
     width: 20px;
     height: 20px;
@@ -1220,7 +1220,7 @@ const STYLE = `
     align-items: center;
     justify-content: center;
   }
-  .info:hover, .field.help-open .info {
+  .info-button:hover, .field.help-open .info-button {
     border-color: var(--primary-color, #03a9f4);
     color: var(--text-primary-color, #fff);
     background: var(--primary-color, #03a9f4);

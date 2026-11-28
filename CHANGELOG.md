@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1
+
+### Fixed
+
+- The line at the top of the panel (data period, current battery, last calculation) was squeezed into a small circle in the top-left corner. The ⓘ buttons from 0.5.0 shared its CSS class name.
+
 ## 0.5.0
 
 ### Added
